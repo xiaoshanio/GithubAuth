@@ -1,0 +1,125 @@
+<style>
+  .logo-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+    margin-top: 24px;
+  }
+  .logo-card {
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: #111116;
+    overflow: hidden;
+    transition: border-color 160ms ease, background-color 160ms ease;
+  }
+  .logo-card:hover,
+  .logo-card.selected {
+    border-color: rgba(168, 85, 247, 0.75);
+    background: #15131a;
+  }
+  .logo-stage {
+    position: relative;
+    display: grid;
+    place-items: center;
+    height: 210px;
+    background: #09090b;
+  }
+  .index-frame {
+    position: absolute;
+    width: 116px;
+    height: 92px;
+    border: 2px solid #474751;
+    border-radius: 14px;
+    background: #1a1a20;
+  }
+  .index-frame.left { transform: translate(-12px, 8px); }
+  .index-frame.right { transform: translate(12px, -7px); border-color: #30303a; }
+  .lock {
+    position: relative;
+    width: 62px;
+    height: 56px;
+    margin-top: 25px;
+    border: 3px solid rgba(0, 0, 0, 0.4);
+    border-radius: 11px;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.38);
+  }
+  .lock::before {
+    content: "";
+    position: absolute;
+    left: 13px;
+    top: -38px;
+    width: 30px;
+    height: 38px;
+    border: 8px solid currentColor;
+    border-bottom: 0;
+    border-radius: 18px 18px 0 0;
+  }
+  .lock::after {
+    content: "";
+    position: absolute;
+    left: 25px;
+    top: 18px;
+    width: 11px;
+    height: 22px;
+    border-radius: 8px 8px 3px 3px;
+    background: #17171c;
+  }
+  .purple .lock { color: #a855f7; background: #a855f7; }
+  .transitioning .lock { color: #70707a; background: #70707a; }
+  .transitioning .lock-body-accent {
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    box-shadow: inset 0 -13px 0 rgba(168, 85, 247, 0.68);
+  }
+  .gray .lock { color: #777782; background: #777782; }
+  .logo-copy { padding: 16px 17px 18px; }
+  .logo-copy strong { display: block; font-size: 14px; color: #f4f4f5; }
+  .logo-copy span { display: block; margin-top: 7px; color: #777781; font-size: 12px; line-height: 1.65; }
+  @media (max-width: 760px) {
+    .logo-options { grid-template-columns: 1fr; }
+    .logo-stage { height: 180px; }
+  }
+</style>
+
+<h2>锁在闭合后应该是什么颜色？</h2>
+<p class="subtitle">两层深灰方框保持当前 Logo 的结构，只比较锁的颜色方向。</p>
+
+<div class="logo-options">
+  <div class="logo-card purple" data-choice="purple" onclick="toggleSelect(this)">
+    <div class="logo-stage">
+      <div class="index-frame left"></div>
+      <div class="index-frame right"></div>
+      <div class="lock"></div>
+    </div>
+    <div class="logo-copy">
+      <strong>A · 保持紫色锁</strong>
+      <span>开锁从上方落下，闭合后仍是当前 Logo 的紫色。识别度最高。</span>
+    </div>
+  </div>
+
+  <div class="logo-card transitioning" data-choice="gray-to-purple" onclick="toggleSelect(this)">
+    <div class="logo-stage">
+      <div class="index-frame left"></div>
+      <div class="index-frame right"></div>
+      <div class="lock"><i class="lock-body-accent"></i></div>
+    </div>
+    <div class="logo-copy">
+      <strong>B · 灰色落下，闭合变紫</strong>
+      <span>移动阶段是灰色，锁梁扣下时紫色从下方点亮，完成感更强。</span>
+    </div>
+  </div>
+
+  <div class="logo-card gray" data-choice="gray" onclick="toggleSelect(this)">
+    <div class="logo-stage">
+      <div class="index-frame left"></div>
+      <div class="index-frame right"></div>
+      <div class="lock"></div>
+    </div>
+    <div class="logo-copy">
+      <strong>C · 全程灰色锁</strong>
+      <span>更克制、偏工业风，但会弱化现有 Logo 的紫色品牌识别。</span>
+    </div>
+  </div>
+</div>

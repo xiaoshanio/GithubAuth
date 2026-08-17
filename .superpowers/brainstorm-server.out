@@ -1,0 +1,14 @@
+{"type":"owner-pid-invalid","pid":1,"reason":"dead at startup"}
+{"type":"server-started","port":53256,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:53256","screen_dir":"D:\\Github\\GithubAuth\\.superpowers\\brainstorm\\1680-1786803519\\content","state_dir":"D:\\Github\\GithubAuth\\.superpowers\\brainstorm\\1680-1786803519\\state"}
+{"type":"screen-added","file":"D:\\Github\\GithubAuth\\.superpowers\\brainstorm\\1680-1786803519\\content\\lock-color-intent.html"}
+{"source":"user-event","type":"click","text":"A · 保持紫色锁\n      开锁从上方落下，闭合后仍是当前 Logo 的紫色。识别度最高。","choice":"purple","id":null,"timestamp":1786803710736}
+{"source":"user-event","type":"click","text":"A · 保持紫色锁\n      开锁从上方落下，闭合后仍是当前 Logo 的紫色。识别度最高。","choice":"purple","id":null,"timestamp":1786803713310}
+{"type":"screen-added","file":"D:\\Github\\GithubAuth\\.superpowers\\brainstorm\\1680-1786803519\\content\\logo-animation-fidelity-v2.html"}
+{"type":"screen-updated","file":"D:\\Github\\GithubAuth\\.superpowers\\brainstorm\\1680-1786803519\\content\\logo-animation-fidelity-v2.html"}
+{"type":"screen-updated","file":"D:\\Github\\GithubAuth\\.superpowers\\brainstorm\\1680-1786803519\\content\\logo-animation-fidelity-v2.html"}
+{"source":"user-event","type":"click","text":"A · 这个方向更接近\n            继续按真实 Logo 拆层完善","choice":"fidelity-approved","id":null,"timestamp":1786805064248}
+{"source":"user-event","type":"click","text":"A · 这个方向更接近\n            继续按真实 Logo 拆层完善","choice":"fidelity-approved","id":null,"timestamp":1786805067626}
+{"type":"screen-added","file":"D:\\Github\\GithubAuth\\.superpowers\\brainstorm\\1680-1786803519\\content\\logo-animation-frames-v3.html"}
+{"type":"screen-updated","file":"D:\\Github\\GithubAuth\\.superpowers\\brainstorm\\1680-1786803519\\content\\logo-animation-frames-v3.html"}
+{"type":"screen-added","file":"D:\\Github\\GithubAuth\\.superpowers\\brainstorm\\1680-1786803519\\content\\continuing-in-terminal-v4.html"}
+{"type":"server-stopped","reason":"idle timeout"}

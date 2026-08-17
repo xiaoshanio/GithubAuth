@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logo 动画高保真方向</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    :root {
+      color-scheme: dark;
+      font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: #0d0e12;
+      color: #f7f7f8;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow-x: hidden;
+      background:
+        radial-gradient(circle at 50% 42%, rgba(255,255,255,.055), transparent 42%),
+        #0d0e12;
+    }
+
+    main {
+      width: min(1440px, calc(100% - 48px));
+      margin: 0 auto;
+      padding: 34px 0 40px;
+    }
+
+    .heading {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 32px;
+      margin-bottom: 22px;
+    }
+
+    h1 {
+      margin: 0 0 7px;
+      font-size: clamp(24px, 3vw, 38px);
+      font-weight: 660;
+      letter-spacing: 0;
+    }
+
+    .heading p, .meta {
+      margin: 0;
+      color: #9fa1aa;
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .meta {
+      flex: none;
+      padding-bottom: 3px;
+      text-align: right;
+    }
+
+    .preview {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 260px;
+      min-height: min(760px, calc(100vh - 180px));
+      overflow: hidden;
+      border: 1px solid #292b33;
+      border-radius: 8px;
+      background: #15161b;
+      box-shadow: 0 28px 80px rgba(0,0,0,.38);
+    }
+
+    .canvas {
+      position: relative;
+      display: grid;
+      min-width: 0;
+      place-items: center;
+      overflow: hidden;
+      background:
+        linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px),
+        #17181d;
+      background-size: 44px 44px;
+    }
+
+    .canvas::before {
+      position: absolute;
+      inset: 0;
+      content: "";
+      background: radial-gradient(circle at center, transparent 0 25%, rgba(8,9,12,.34) 72%, rgba(8,9,12,.78) 100%);
+      pointer-events: none;
+    }
+
+    .mark {
+      position: relative;
+      width: min(68vw, 670px);
+      aspect-ratio: 1;
+      filter: drop-shadow(0 32px 38px rgba(0,0,0,.38));
+    }
+
+    .index-frame {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 76%;
+      height: 76%;
+      border-radius: 13%;
+      opacity: 0;
+      will-change: transform, opacity;
+    }
+
+    .frame-left {
+      z-index: 1;
+      border: 3px solid rgba(196, 140, 255, .34);
+      background: rgba(139, 70, 220, .075);
+      box-shadow: inset 0 0 40px rgba(147, 71, 231, .045), 0 18px 36px rgba(0,0,0,.18);
+      animation: frame-left-in 6.2s cubic-bezier(.16,.84,.24,1) infinite;
+    }
+
+    .frame-right {
+      z-index: 2;
+      width: 81%;
+      height: 81%;
+      border: 3px solid rgba(255,255,255,.14);
+      background: rgba(17,17,22,.9);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 22px 42px rgba(0,0,0,.26);
+      animation: frame-right-in 6.2s cubic-bezier(.16,.84,.24,1) infinite;
+    }
+
+    .logo-piece, .final-logo {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .rear {
+      z-index: 3;
+      clip-path: polygon(24% 12%, 57% 13%, 61% 22%, 88% 28%, 92% 35%, 91% 78%, 84% 82%, 73% 81%, 73% 42%, 15% 41%, 16% 26%);
+      animation: rear-in 6.2s cubic-bezier(.18,.78,.22,1) infinite;
+    }
+
+    .front-wrap {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      animation: front-in 6.2s cubic-bezier(.18,.78,.22,1) infinite;
+    }
+
+    .front {
+      clip-path: polygon(13% 22%, 46% 22%, 53% 30%, 83% 31%, 86% 36%, 86% 81%, 80% 88%, 20% 83%, 13% 77%);
+    }
+
+    .lock-cover {
+      position: absolute;
+      left: 36.5%;
+      top: 38.5%;
+      width: 29%;
+      height: 38%;
+      clip-path: polygon(20% 0, 80% 0, 100% 22%, 100% 84%, 83% 100%, 18% 100%, 0 82%, 0 23%);
+      border: 1px solid rgba(122,125,139,.32);
+      background:
+        linear-gradient(145deg, rgba(73,76,90,.55), transparent 26%),
+        linear-gradient(165deg, #25272f 0%, #17191f 58%, #0d0f14 100%);
+      box-shadow:
+        inset 8px 9px 15px rgba(255,255,255,.035),
+        inset -9px -12px 18px rgba(0,0,0,.38),
+        0 0 0 8px rgba(8,9,12,.56);
+    }
+
+    .lock-texture {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 5;
+      opacity: 0;
+      animation: lock-enter 6.2s cubic-bezier(.2,.82,.22,1) infinite;
+      filter: drop-shadow(0 17px 12px rgba(0,0,0,.42)) drop-shadow(0 0 24px rgba(159,56,255,.18));
+      overflow: visible;
+    }
+
+    .shackle-piece {
+      transform-box: fill-box;
+      transform: translate(36px, -42px) rotate(16deg);
+      transform-origin: 87% 100%;
+      animation: shackle-close 6.2s cubic-bezier(.18,.9,.2,1) infinite;
+    }
+
+    .final-logo {
+      z-index: 6;
+      opacity: 0;
+      animation: final-resolve 6.2s ease infinite;
+    }
+
+    .ground-shadow {
+      position: absolute;
+      left: 22%;
+      right: 18%;
+      bottom: 11%;
+      height: 7%;
+      border-radius: 50%;
+      background: rgba(0,0,0,.42);
+      filter: blur(18px);
+      animation: shadow-pulse 6.2s ease infinite;
+    }
+
+    @keyframes frame-left-in {
+      0%, 3% { opacity: 0; transform: translate(-175%, -47%) rotate(-7deg) scale(.94); }
+      8% { opacity: 1; }
+      24%, 95% { opacity: 1; transform: translate(-55%, -47%) rotate(-2.5deg) scale(1); }
+      100% { opacity: 0; transform: translate(-55%, -47%) rotate(-2.5deg) scale(1.015); }
+    }
+
+    @keyframes frame-right-in {
+      0%, 7% { opacity: 0; transform: translate(120%, -51%) rotate(7deg) scale(.94); }
+      12% { opacity: 1; }
+      28%, 95% { opacity: 1; transform: translate(-45%, -51%) rotate(2deg) scale(1); }
+      100% { opacity: 0; transform: translate(-45%, -51%) rotate(2deg) scale(1.015); }
+    }
+
+    @keyframes rear-in {
+      0%, 15% { opacity: 0; transform: translateX(-125%) rotate(-8deg) scale(.94); }
+      21% { opacity: 1; }
+      34%, 78% { opacity: 1; transform: translateX(0) rotate(0) scale(1); }
+      84%, 96% { opacity: 0; transform: translateX(0) scale(1); }
+      100% { opacity: 0; }
+    }
+
+    @keyframes front-in {
+      0%, 18% { opacity: 0; transform: translateX(125%) rotate(7deg) scale(.94); }
+      24% { opacity: 1; }
+      39%, 78% { opacity: 1; transform: translateX(0) rotate(0) scale(1); }
+      84%, 96% { opacity: 0; transform: translateX(0) scale(1); }
+      100% { opacity: 0; }
+    }
+
+    @keyframes lock-enter {
+      0%, 39% { opacity: 0; transform: translateY(-105%) scale(.9); }
+      44% { opacity: 1; }
+      59% { opacity: 1; transform: translateY(2.5%) scale(1.025); }
+      63%, 78% { opacity: 1; transform: translateY(0) scale(1); }
+      84%, 96% { opacity: 0; transform: translateY(0) scale(1); }
+      100% { opacity: 0; }
+    }
+
+    @keyframes shackle-close {
+      0%, 58% { transform: translate(36px, -42px) rotate(16deg); }
+      70%, 100% { transform: translate(0, 0) rotate(0); }
+    }
+
+    @keyframes final-resolve {
+      0%, 77% { opacity: 0; transform: scale(.992); }
+      84%, 95% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.012); }
+    }
+
+    @keyframes shadow-pulse {
+      0%, 10% { opacity: .2; transform: scaleX(.55); }
+      38% { opacity: .66; transform: scaleX(1); }
+      84%, 95% { opacity: .78; transform: scaleX(1.04); }
+      100% { opacity: .15; transform: scaleX(.6); }
+    }
+
+    .notes {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      padding: 32px 24px;
+      border-left: 1px solid #292b33;
+      background: #111217;
+    }
+
+    .eyebrow {
+      margin: 0 0 23px;
+      color: #8c8e97;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .step {
+      position: relative;
+      min-height: 84px;
+      padding-left: 33px;
+      color: #a8aab2;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .step::before {
+      position: absolute;
+      left: 0;
+      top: 2px;
+      display: grid;
+      width: 21px;
+      height: 21px;
+      place-items: center;
+      border: 1px solid #444650;
+      border-radius: 50%;
+      color: #d8d9de;
+      content: attr(data-index);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .step:not(:last-of-type)::after {
+      position: absolute;
+      left: 10px;
+      top: 27px;
+      bottom: 6px;
+      width: 1px;
+      content: "";
+      background: #30323a;
+    }
+
+    .step strong {
+      display: block;
+      margin-bottom: 4px;
+      color: #ececf0;
+      font-size: 14px;
+      font-weight: 620;
+    }
+
+    .decision {
+      margin-top: auto;
+      padding-top: 28px;
+    }
+
+    .option {
+      width: 100%;
+      padding: 14px 15px;
+      border: 1px solid #4b3166;
+      border-radius: 6px;
+      background: #1b1522;
+      color: #f1e8fa;
+      cursor: pointer;
+      text-align: left;
+      transition: border-color .18s ease, background .18s ease;
+    }
+
+    .option:hover, .option.selected {
+      border-color: #ad55ee;
+      background: #25182f;
+    }
+
+    .option strong { display: block; margin-bottom: 3px; font-size: 13px; }
+    .option span { color: #ad9cb9; font-size: 12px; }
+
+    @media (max-width: 900px) {
+      main { width: min(100% - 24px, 720px); padding-top: 20px; }
+      .heading { align-items: flex-start; flex-direction: column; gap: 6px; }
+      .meta { text-align: left; }
+      .preview { grid-template-columns: 1fr; min-height: 0; }
+      .canvas { min-height: min(72vh, 650px); }
+      .mark { width: min(92vw, 590px); }
+      .notes { border-top: 1px solid #292b33; border-left: 0; }
+      .step { min-height: 70px; }
+      .decision { margin-top: 8px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .index-frame, .rear, .front-wrap, .lock-texture, .shackle-piece, .final-logo, .ground-shadow { animation: none; }
+      .final-logo { opacity: 1; }
+      .frame-left { opacity: 1; transform: translate(-55%, -47%) rotate(-2.5deg); }
+      .frame-right { opacity: 1; transform: translate(-45%, -51%) rotate(2deg); }
+      .rear, .front-wrap, .lock-texture, .ground-shadow { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="heading">
+      <div>
+        <h1>更贴近现有 Logo 的组装动画</h1>
+        <p>两层背景框先从左右拼合，再组装文件夹和紫色锁。</p>
+      </div>
+      <p class="meta">1920 × 1920 原始素材 · 双背景框 · 紫色锁</p>
+    </header>
+
+    <section class="preview">
+      <div class="canvas">
+        <div class="mark" aria-label="Logo 组装动画预览">
+          <div class="index-frame frame-left"></div>
+          <div class="index-frame frame-right"></div>
+          <div class="ground-shadow"></div>
+          <img class="logo-piece rear" src="http://127.0.0.1:3000/assets/github-vault-logo_fdf70cb3.png" alt="">
+          <div class="front-wrap">
+            <img class="logo-piece front" src="http://127.0.0.1:3000/assets/github-vault-logo_fdf70cb3.png" alt="">
+            <div class="lock-cover"></div>
+          </div>
+          <svg class="lock-texture" viewBox="0 0 1536 1536" aria-hidden="true">
+            <defs>
+              <clipPath id="lock-body-clip" clipPathUnits="userSpaceOnUse">
+                <path d="M 580 735 L 650 780 L 850 780 L 930 820 L 930 1018 L 865 1118 L 610 1118 L 516 1016 L 516 790 Z" />
+              </clipPath>
+              <clipPath id="lock-shackle-clip" clipPathUnits="userSpaceOnUse">
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M 598 770 L 598 640 C 598 588 650 554 726 554 C 804 554 854 592 854 646 L 854 770 Z M 650 770 L 650 661 C 650 621 682 598 726 598 C 771 598 804 626 804 668 L 804 770 Z" />
+              </clipPath>
+            </defs>
+            <g class="shackle-piece" clip-path="url(#lock-shackle-clip)">
+              <image href="http://127.0.0.1:3000/assets/github-vault-logo_fdf70cb3.png" width="1536" height="1536" />
+            </g>
+            <g clip-path="url(#lock-body-clip)">
+              <image href="http://127.0.0.1:3000/assets/github-vault-logo_fdf70cb3.png" width="1536" height="1536" />
+            </g>
+          </svg>
+          <img class="final-logo" src="http://127.0.0.1:3000/assets/github-vault-logo_fdf70cb3.png" alt="当前 GithubAuth Logo">
+        </div>
+      </div>
+
+      <aside class="notes">
+        <p class="eyebrow">动画分镜</p>
+        <div class="step" data-index="01">
+          <strong>两层方框左右进入</strong>
+          紫色框从左、深色框从右，停在 Logo 后方。
+        </div>
+        <div class="step" data-index="02">
+          <strong>后层从左进入</strong>
+          使用 Logo 原图的后层轮廓和材质。
+        </div>
+        <div class="step" data-index="03">
+          <strong>前层从右拼合</strong>
+          合并成深色 3D 文件夹主体。
+        </div>
+        <div class="step" data-index="04">
+          <strong>紫色开锁落下</strong>
+          保持当前 Logo 的颜色和八边形体块。
+        </div>
+        <div class="step" data-index="05">
+          <strong>锁梁闭合</strong>
+          最终无缝切换到 1920px Logo 原图。
+        </div>
+
+        <div class="decision">
+          <button class="option" data-choice="fidelity-approved" onclick="toggleSelect(this)">
+            <strong>A · 这个方向更接近</strong>
+            <span>保留两层背景框后继续完善</span>
+          </button>
+        </div>
+      </aside>
+    </section>
+  </main>
+</body>
+</html>
+

@@ -1,0 +1,17 @@
+{
+  "name": "代码托管账户保管库",
+  "short_name": "账户保管库",
+  "description": "本地加密的代码托管账户索引",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#08080a",
+  "theme_color": "#08080a",
+  "icons": [
+    {
+      "src": "./assets/github-vault-logo_fdf70cb3.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

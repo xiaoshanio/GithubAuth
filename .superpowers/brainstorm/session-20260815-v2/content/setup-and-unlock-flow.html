@@ -1,0 +1,62 @@
+<h2>初始化与解锁流程</h2>
+<p class="subtitle">所有步骤保持在窗口正中央；同一张固定宽度面板切换内容，不产生横向跳动。</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">步骤 1 / 2 · 设置主密码</div>
+    <div class="mockup-body" style="min-height:390px;display:grid;place-items:center;background:#08080a">
+      <div style="width:min(100%,390px);border:1px solid #303038;border-radius:8px;padding:22px;background:#121217;box-shadow:0 18px 50px #0008">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+          <strong>初始化本地保管库</strong><span style="font-size:11px;color:#a78bfa">01 / 02</span>
+        </div>
+        <label style="display:block;font-size:12px;color:#b4b4be;margin-bottom:6px">主密码</label>
+        <input class="mock-input" style="width:100%;box-sizing:border-box;margin-bottom:13px" value="••••••••••••••" readonly>
+        <label style="display:block;font-size:12px;color:#b4b4be;margin-bottom:6px">确认主密码</label>
+        <input class="mock-input" style="width:100%;box-sizing:border-box;margin-bottom:18px" value="••••••••••••••" readonly>
+        <button class="mock-button" style="width:100%;background:#9333ea;color:white">继续</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">步骤 2 / 2 · 选择登录方式</div>
+    <div class="mockup-body" style="min-height:390px;display:grid;place-items:center;background:#08080a">
+      <div style="width:min(100%,500px);border:1px solid #303038;border-radius:8px;padding:22px;background:#121217;box-shadow:0 18px 50px #0008">
+        <strong>以后如何解锁？</strong>
+        <p style="font-size:12px;color:#8d8d98;margin:6px 0 16px">主密码始终可用，2FA 是当前设备上的快速解锁方式。</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="border:1px solid #3f3f46;border-radius:8px;padding:18px;min-height:120px">
+            <div style="font-size:22px">⌨</div><strong style="display:block;margin-top:12px">仅使用密码登录</strong>
+            <span style="font-size:11px;color:#8d8d98">无需绑定设备</span>
+          </div>
+          <div style="border:1px solid #a855f7;border-radius:8px;padding:18px;min-height:120px;background:#a855f70d">
+            <div style="font-size:22px">▦</div><strong style="display:block;margin-top:12px">添加 2FA 快速登录</strong>
+            <span style="font-size:11px;color:#c4b5fd">Google Authenticator</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mockup" style="margin-top:20px">
+  <div class="mockup-header">选择右侧后 · 二维码验证弹窗</div>
+  <div class="mockup-body" style="min-height:380px;display:grid;place-items:center;background:#08080a">
+    <div style="width:min(100%,520px);display:grid;grid-template-columns:170px 1fr;gap:22px;border:1px solid #3c3c45;border-radius:8px;padding:22px;background:#15151a;box-shadow:0 24px 80px #000b">
+      <div style="aspect-ratio:1;background:repeating-conic-gradient(#111 0 25%,#fff 0 50%) 0/22px 22px;border:10px solid white;border-radius:6px"></div>
+      <div>
+        <div class="label">Google Authenticator</div>
+        <h3 style="margin:5px 0 8px">扫描二维码</h3>
+        <p style="font-size:12px;color:#9ca3af;line-height:1.6">扫描后输入当前 6 位验证码完成绑定。未验证成功前不会启用快速登录。</p>
+        <input class="mock-input" style="width:100%;box-sizing:border-box;margin:13px 0;text-align:center;letter-spacing:8px" value="123 456" readonly>
+        <button class="mock-button" style="width:100%;background:#9333ea;color:white">验证并完成初始化</button>
+        <button style="width:100%;border:0;background:transparent;color:#a1a1aa;padding:10px">返回，仅使用密码</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>后续解锁</h3>
+  <p>启用后默认显示“验证码快速解锁”，并提供“改用主密码”切换；连续失败会逐步延长等待时间。通过主密码解锁后，可在设置中停用或重新绑定 2FA。</p>
+</div>

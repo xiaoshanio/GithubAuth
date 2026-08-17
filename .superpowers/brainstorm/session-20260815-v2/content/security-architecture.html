@@ -1,0 +1,60 @@
+<h2>Github Auth 安全架构</h2>
+<p class="subtitle">密码保护可迁移备份；验证码快速解锁只绑定当前 Windows 用户和设备。</p>
+
+<div class="mockup">
+  <div class="mockup-header">解锁与存储数据流</div>
+  <div class="mockup-body" style="display:grid;gap:18px">
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:14px;align-items:center">
+      <div style="border:1px solid #4b5563;border-radius:8px;padding:16px;background:#111318">
+        <div class="label">React 界面</div>
+        <strong>密码 / 6 位验证码</strong>
+        <p style="margin:6px 0 0;color:#9ca3af;font-size:13px">仅负责输入、展示和状态切换</p>
+      </div>
+      <div style="font-size:24px;color:#a855f7">→</div>
+      <div style="border:1px solid #7e22ce;border-radius:8px;padding:16px;background:#17111d">
+        <div class="label">Tauri / Rust 安全内核</div>
+        <strong>Argon2id · AES-256-GCM · TOTP</strong>
+        <p style="margin:6px 0 0;color:#9ca3af;font-size:13px">验证、派生密钥、加解密、原子写盘</p>
+      </div>
+    </div>
+
+    <div style="text-align:center;color:#a855f7;font-size:22px">↓</div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+      <div style="border:1px solid #374151;border-radius:8px;padding:15px;background:#0d0f13">
+        <div class="label">主保管库 v2</div>
+        <strong>随机数据密钥</strong>
+        <p style="margin:6px 0 0;color:#9ca3af;font-size:12px">密文、盐、随机 nonce、认证标签</p>
+      </div>
+      <div style="border:1px solid #374151;border-radius:8px;padding:15px;background:#0d0f13">
+        <div class="label">Windows DPAPI</div>
+        <strong>本机快速解锁材料</strong>
+        <p style="margin:6px 0 0;color:#9ca3af;font-size:12px">只允许当前 Windows 用户读取</p>
+      </div>
+      <div style="border:1px solid #374151;border-radius:8px;padding:15px;background:#0d0f13">
+        <div class="label">加密备份</div>
+        <strong>备份时的主密码</strong>
+        <p style="margin:6px 0 0;color:#9ca3af;font-size:12px">不依赖 DPAPI，可跨设备导入</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="pros-cons">
+  <div class="pros">
+    <h4>安全边界</h4>
+    <ul>
+      <li>敏感文件操作与加密集中在 Rust</li>
+      <li>每次写入使用新的随机 nonce</li>
+      <li>旧版 v1 仅在正确密码解锁后迁移</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>明确限制</h4>
+    <ul>
+      <li>验证码快速解锁依赖 Windows 登录安全</li>
+      <li>它不是可跨设备的第二个解密密码</li>
+      <li>备份始终需要生成时的主密码</li>
+    </ul>
+  </div>
+</div>

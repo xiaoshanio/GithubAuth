@@ -1,0 +1,65 @@
+<h2>备份与导入</h2>
+<p class="subtitle">自动备份保存完整加密快照；导入时明确区分“备份密码”和“当前主密码”。</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">设置 · 备份</div>
+    <div class="mockup-body" style="background:#0b0b0e;padding:20px">
+      <div style="display:flex;justify-content:space-between;gap:20px;padding-bottom:15px;border-bottom:1px solid #303038">
+        <div><strong>自动备份</strong><p style="font-size:12px;color:#8f8f9a;margin:5px 0 0">仅软件运行期间执行</p></div>
+        <div style="width:42px;height:24px;border-radius:12px;background:#9333ea;padding:3px;box-sizing:border-box"><div style="width:18px;height:18px;border-radius:50%;background:white;margin-left:auto"></div></div>
+      </div>
+      <label style="display:block;font-size:12px;color:#aaa;margin:15px 0 6px">频率</label>
+      <div class="mock-input" style="display:flex;justify-content:space-between">每天一次 <span>⌄</span></div>
+      <label style="display:block;font-size:12px;color:#aaa;margin:15px 0 6px">保存位置</label>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:8px"><div class="mock-input" style="overflow:hidden;text-overflow:ellipsis">%LOCALAPPDATA%\com.githubauth.vault\backups</div><button class="mock-button">选择</button></div>
+      <label style="display:block;font-size:12px;color:#aaa;margin:15px 0 6px">保留数量</label>
+      <div class="mock-input">最近 10 份</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px"><button class="mock-button" style="background:#9333ea;color:white">立即备份</button><button class="mock-button">导入备份</button></div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">导入 · 解密与预览</div>
+    <div class="mockup-body" style="background:#0b0b0e;padding:20px">
+      <div class="label">github-auth-backup · v2</div>
+      <h3 style="margin:6px 0 14px">输入备份生成时的主密码</h3>
+      <input class="mock-input" style="width:100%;box-sizing:border-box" value="••••••••••••••" readonly>
+      <button class="mock-button" style="width:100%;margin-top:10px;background:#9333ea;color:white">验证并读取</button>
+      <div style="margin-top:18px;border:1px solid #35353e;border-radius:8px;padding:14px;background:#121217">
+        <strong>备份摘要</strong>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;text-align:center">
+          <div><b>18</b><small style="display:block;color:#888">账户</small></div>
+          <div><b>4</b><small style="display:block;color:#888">分组</small></div>
+          <div><b>2026-08-15</b><small style="display:block;color:#888">创建日期</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options" style="margin-top:20px">
+  <div class="option">
+    <div class="letter">1</div>
+    <div class="content"><h3>添加到当前数据</h3><p>导入账户和原分组；重建 ID，重名分组自动添加“导入”后缀，当前设置不变。</p></div>
+  </div>
+  <div class="option" style="border-color:#a855f7">
+    <div class="letter">2</div>
+    <div class="content"><h3>替换当前数据</h3><p>先询问是否备份当前数据；无论选“是”或“否”，下一步都必须验证当前主密码。当前主密码与 2FA 绑定保持不变。</p></div>
+  </div>
+  <div class="option">
+    <div class="letter">3</div>
+    <div class="content"><h3>加入一个备份分类</h3><p>创建“备份导入 · 日期”分组，将全部导入账户放入其中；忽略备份分组和设置。</p></div>
+  </div>
+</div>
+
+<div class="mockup" style="margin-top:20px">
+  <div class="mockup-header">选择 2 · 替换授权顺序</div>
+  <div class="mockup-body" style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:12px;align-items:center;background:#0b0b0e">
+    <div style="padding:14px;border:1px solid #3f3f46;border-radius:8px"><div class="label">第一步</div><strong>备份当前数据？</strong><p style="font-size:12px;color:#888">是 / 否</p></div>
+    <span style="color:#a855f7;font-size:22px">→</span>
+    <div style="padding:14px;border:1px solid #a855f7;border-radius:8px"><div class="label">第二步</div><strong>输入当前主密码</strong><p style="font-size:12px;color:#888">再次授权替换</p></div>
+    <span style="color:#a855f7;font-size:22px">→</span>
+    <div style="padding:14px;border:1px solid #3f3f46;border-radius:8px"><div class="label">第三步</div><strong>原子替换并验证</strong><p style="font-size:12px;color:#888">失败时保留原数据</p></div>
+  </div>
+</div>

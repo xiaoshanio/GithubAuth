@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>GithubAuth Logo Animation</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      :root {
+        color-scheme: dark;
+        font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+        background: #101115;
+        color: #f5f5f7;
+      }
+
+      html,
+      body {
+        min-width: 320px;
+        min-height: 100%;
+      }
+
+      body {
+        margin: 0;
+        background: #101115;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .prototype-shell {
+        display: grid;
+        min-height: 100vh;
+        grid-template-rows: auto 1fr;
+      }
+
+      .toolbar {
+        position: relative;
+        z-index: 20;
+        display: flex;
+        min-height: 58px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 22px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.085);
+        background: rgba(16, 17, 21, 0.92);
+      }
+
+      .product-name {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 10px;
+        color: #dedee3;
+        font-size: 13px;
+        font-weight: 650;
+        letter-spacing: 0;
+      }
+
+      .product-mark {
+        width: 8px;
+        height: 8px;
+        flex: none;
+        border-radius: 2px;
+        background: #a64cf4;
+        box-shadow: 0 0 14px rgba(166, 76, 244, 0.55);
+      }
+
+      .replay-button {
+        display: grid;
+        width: 36px;
+        height: 36px;
+        flex: none;
+        place-items: center;
+        border: 1px solid rgba(255, 255, 255, 0.13);
+        border-radius: 6px;
+        background: #191a20;
+        color: #ececf1;
+        cursor: pointer;
+        font-size: 22px;
+        line-height: 1;
+        transition:
+          border-color 0.16s ease,
+          background-color 0.16s ease;
+      }
+
+      .replay-button:hover {
+        border-color: rgba(193, 118, 255, 0.55);
+        background: #202128;
+      }
+
+      .replay-button:focus-visible {
+        outline: 2px solid #b85cff;
+        outline-offset: 2px;
+      }
+
+      .replay-button:disabled {
+        cursor: not-allowed;
+        opacity: 0.45;
+      }
+
+      .stage {
+        position: relative;
+        display: grid;
+        min-height: calc(100vh - 58px);
+        place-items: center;
+        overflow: hidden;
+        background-color: #17181d;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+          linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0.022) 1px,
+            transparent 1px
+          );
+        background-size: 48px 48px;
+        isolation: isolate;
+      }
+
+      .stage::after {
+        position: absolute;
+        z-index: 10;
+        inset: 0;
+        content: "";
+        border: 1px solid rgba(0, 0, 0, 0.15);
+        pointer-events: none;
+      }
+
+      .mark {
+        position: relative;
+        width: min(82vmin, 780px);
+        aspect-ratio: 1;
+        flex: none;
+        filter: drop-shadow(0 34px 38px rgba(0, 0, 0, 0.42));
+        transform: translateZ(0);
+      }
+
+      .index-frame {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        visibility: hidden;
+        opacity: 0;
+        will-change: transform, opacity;
+      }
+
+      .frame-left {
+        z-index: 1;
+        width: 76%;
+        height: 76%;
+        border: 3px solid rgba(196, 140, 255, 0.34);
+        border-radius: 13%;
+        background: rgba(139, 70, 220, 0.075);
+        box-shadow:
+          inset 0 0 38px rgba(147, 71, 231, 0.045),
+          0 18px 36px rgba(0, 0, 0, 0.18);
+      }
+
+      .frame-right {
+        z-index: 2;
+        width: 81%;
+        height: 81%;
+        border: 3px solid rgba(255, 255, 255, 0.14);
+        border-radius: 13%;
+        background: rgba(17, 17, 22, 0.76);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.035),
+          0 22px 42px rgba(0, 0, 0, 0.26);
+      }
+
+      .frame-top {
+        z-index: 3;
+        width: 73%;
+        height: 73%;
+        border: 3px solid rgba(151, 154, 168, 0.24);
+        border-radius: 12.5%;
+        background: rgba(35, 36, 43, 0.28);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.04),
+          0 16px 34px rgba(0, 0, 0, 0.18);
+      }
+
+      .frame-bottom {
+        z-index: 4;
+        width: 78%;
+        height: 78%;
+        border: 3px solid rgba(153, 83, 216, 0.24);
+        border-radius: 13%;
+        background: rgba(43, 27, 55, 0.16);
+        box-shadow:
+          inset 0 0 30px rgba(158, 75, 232, 0.035),
+          0 18px 34px rgba(0, 0, 0, 0.2);
+      }
+
+      .ground-shadow {
+        position: absolute;
+        z-index: 0;
+        left: 22%;
+        right: 18%;
+        bottom: 11%;
+        height: 7%;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.48);
+        filter: blur(20px);
+        opacity: 0.22;
+        transform: scaleX(0.58);
+        will-change: transform, opacity;
+      }
+
+      .final-logo {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        user-select: none;
+        pointer-events: none;
+      }
+
+      .lock-socket {
+        position: absolute;
+        z-index: 5;
+        left: 35%;
+        top: 38%;
+        width: 30%;
+        height: 37%;
+        visibility: hidden;
+        opacity: 0;
+        clip-path: polygon(
+          22% 0,
+          78% 0,
+          100% 22%,
+          100% 80%,
+          80% 100%,
+          20% 100%,
+          0 80%,
+          0 22%
+        );
+        border: 1px solid rgba(139, 142, 156, 0.2);
+        background: #0d0e13;
+        box-shadow:
+          inset 8px 10px 16px rgba(255, 255, 255, 0.025),
+          inset -12px -14px 20px rgba(0, 0, 0, 0.46),
+          0 0 0 8px rgba(8, 9, 13, 0.28);
+        will-change: transform, opacity;
+      }
+
+      .lock-module {
+        position: absolute;
+        z-index: 6;
+        inset: 0;
+        visibility: hidden;
+        opacity: 0;
+        will-change: transform, opacity;
+      }
+
+      .lock-texture {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+        filter: drop-shadow(0 17px 13px rgba(0, 0, 0, 0.45))
+          drop-shadow(0 0 22px rgba(159, 56, 255, 0.14));
+      }
+
+      .lock-shackle {
+        transform-box: fill-box;
+        will-change: transform;
+      }
+
+      .final-logo {
+        z-index: 7;
+        opacity: 1;
+        visibility: visible;
+        will-change: transform, opacity;
+      }
+
+      .status {
+        position: absolute;
+        z-index: 30;
+        left: 50%;
+        bottom: 24px;
+        display: none;
+        max-width: min(520px, calc(100% - 32px));
+        margin: 0;
+        padding: 9px 12px;
+        transform: translateX(-50%);
+        border: 1px solid rgba(255, 134, 134, 0.34);
+        border-radius: 5px;
+        background: rgba(42, 18, 20, 0.92);
+        color: #ffc2c2;
+        font-size: 12px;
+        line-height: 1.5;
+        text-align: center;
+      }
+
+      .status.is-visible {
+        display: block;
+      }
+
+      body.static-mode .frame-left {
+        visibility: visible;
+        opacity: 1;
+        transform: translate(-55%, -47%) rotate(-2.5deg);
+      }
+
+      body.static-mode .frame-right {
+        visibility: visible;
+        opacity: 1;
+        transform: translate(-45%, -51%) rotate(2deg);
+      }
+
+      body.static-mode .frame-top {
+        visibility: visible;
+        opacity: 1;
+        transform: translate(-50%, -57%) rotate(-1.5deg);
+      }
+
+      body.static-mode .frame-bottom {
+        visibility: visible;
+        opacity: 1;
+        transform: translate(-50%, -43%) rotate(1.5deg);
+      }
+
+      body.static-mode .final-logo {
+        visibility: visible;
+        opacity: 1;
+      }
+
+      body.asset-error .mark {
+        display: none;
+      }
+
+      @media (max-width: 640px) {
+        .toolbar {
+          min-height: 52px;
+          padding: 0 14px;
+        }
+
+        .stage {
+          min-height: calc(100vh - 52px);
+        }
+
+        .mark {
+          width: min(96vw, 560px);
+        }
+
+        .replay-button {
+          width: 34px;
+          height: 34px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="prototype-shell">
+      <header class="toolbar">
+        <div class="product-name">
+          <span class="product-mark" aria-hidden="true"></span>
+          <span>GithubAuth · Logo Motion Test</span>
+        </div>
+        <button
+          id="replay"
+          class="replay-button"
+          type="button"
+          title="重新播放"
+          aria-label="重新播放动画"
+        >
+          <span aria-hidden="true">↻</span>
+        </button>
+      </header>
+
+      <section class="stage" aria-label="GithubAuth Logo 动画测试">
+        <div id="mark" class="mark">
+          <div class="index-frame frame-left"></div>
+          <div class="index-frame frame-right"></div>
+          <div class="index-frame frame-top"></div>
+          <div class="index-frame frame-bottom"></div>
+          <div class="ground-shadow"></div>
+          <div class="lock-socket"></div>
+
+          <div class="lock-module">
+            <svg
+              class="lock-texture"
+              viewBox="0 0 1920 1920"
+              aria-hidden="true"
+            >
+              <defs>
+                <clipPath id="lock-body-clip" clipPathUnits="userSpaceOnUse">
+                  <path
+                    d="M 725 919 L 813 975 L 1063 975 L 1163 1025 L 1163 1273 L 1081 1398 L 763 1398 L 645 1270 L 645 988 Z"
+                  ></path>
+                </clipPath>
+                <clipPath id="lock-shackle-clip" clipPathUnits="userSpaceOnUse">
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M 748 963 L 748 800 C 748 735 813 693 908 693 C 1005 693 1068 740 1068 808 L 1068 963 Z M 813 963 L 813 826 C 813 776 853 748 908 748 C 964 748 1005 783 1005 835 L 1005 963 Z"
+                  ></path>
+                </clipPath>
+              </defs>
+              <g class="lock-shackle" clip-path="url(#lock-shackle-clip)">
+                <image
+                  href="../client/public/assets/github-vault-logo_fdf70cb3.png"
+                  width="1920"
+                  height="1920"
+                ></image>
+              </g>
+              <g clip-path="url(#lock-body-clip)">
+                <image
+                  href="../client/public/assets/github-vault-logo_fdf70cb3.png"
+                  width="1920"
+                  height="1920"
+                ></image>
+              </g>
+            </svg>
+          </div>
+
+          <img
+            class="final-logo"
+            src="../client/public/assets/github-vault-logo_fdf70cb3.png"
+            alt="GithubAuth"
+          />
+        </div>
+
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+    <script>
+      (() => {
+        const assetUrl =
+          "../client/public/assets/github-vault-logo_fdf70cb3.png";
+        const replayButton = document.querySelector("#replay");
+        const status = document.querySelector("#status");
+
+        const showStatus = message => {
+          status.textContent = message;
+          status.classList.add("is-visible");
+        };
+
+        const showStaticFallback = message => {
+          document.body.classList.add("static-mode");
+          replayButton.disabled = true;
+          showStatus(message);
+        };
+
+        if (!window.gsap) {
+          showStaticFallback("GSAP 未加载，当前显示静态 Logo。");
+          return;
+        }
+
+        const preload = new Image();
+
+        preload.addEventListener("error", () => {
+          document.body.classList.add("asset-error");
+          replayButton.disabled = true;
+          showStatus("Logo 素材加载失败。");
+        });
+
+        preload.addEventListener("load", () => {
+          const { gsap } = window;
+          const frameLeft = document.querySelector(".frame-left");
+          const frameRight = document.querySelector(".frame-right");
+          const frameTop = document.querySelector(".frame-top");
+          const frameBottom = document.querySelector(".frame-bottom");
+          const socket = document.querySelector(".lock-socket");
+          const lockModule = document.querySelector(".lock-module");
+          const shackle = document.querySelector(".lock-shackle");
+          const finalLogo = document.querySelector(".final-logo");
+          const shadow = document.querySelector(".ground-shadow");
+          const assemblyLayers = [socket, lockModule];
+          let timeline = null;
+
+          const showFinalState = () => {
+            gsap.set(frameLeft, {
+              autoAlpha: 1,
+              xPercent: -55,
+              yPercent: -47,
+              rotation: -2.5,
+              scale: 1,
+            });
+            gsap.set(frameRight, {
+              autoAlpha: 1,
+              xPercent: -45,
+              yPercent: -51,
+              rotation: 2,
+              scale: 1,
+            });
+            gsap.set(frameTop, {
+              autoAlpha: 1,
+              xPercent: -50,
+              yPercent: -57,
+              rotation: -1.5,
+              scale: 1,
+            });
+            gsap.set(frameBottom, {
+              autoAlpha: 1,
+              xPercent: -50,
+              yPercent: -43,
+              rotation: 1.5,
+              scale: 1,
+            });
+            gsap.set(assemblyLayers, { autoAlpha: 0 });
+            gsap.set(finalLogo, { autoAlpha: 1, scale: 1 });
+            gsap.set(shadow, { opacity: 0.78, scaleX: 1.04 });
+          };
+
+          const buildTimeline = ({ reducedMotion }) => {
+            gsap.set(shackle, {
+              x: 44,
+              y: -52,
+              rotation: 16,
+              svgOrigin: "1060 960",
+            });
+
+            const nextTimeline = gsap.timeline({
+              paused: true,
+              repeat: reducedMotion ? 0 : -1,
+              defaults: { ease: "power3.out" },
+            });
+
+            nextTimeline
+              .addLabel("frames", 0)
+              .fromTo(
+                frameLeft,
+                {
+                  autoAlpha: 0,
+                  xPercent: -180,
+                  yPercent: -47,
+                  rotation: -7,
+                  scale: 0.94,
+                },
+                {
+                  autoAlpha: 1,
+                  xPercent: -55,
+                  yPercent: -47,
+                  rotation: -2.5,
+                  scale: 1,
+                  duration: 0.8,
+                },
+                "frames"
+              )
+              .fromTo(
+                frameRight,
+                {
+                  autoAlpha: 0,
+                  xPercent: 120,
+                  yPercent: -51,
+                  rotation: 7,
+                  scale: 0.94,
+                },
+                {
+                  autoAlpha: 1,
+                  xPercent: -45,
+                  yPercent: -51,
+                  rotation: 2,
+                  scale: 1,
+                  duration: 0.8,
+                },
+                "frames+=0.12"
+              )
+              .fromTo(
+                frameTop,
+                {
+                  autoAlpha: 0,
+                  xPercent: -50,
+                  yPercent: -180,
+                  rotation: -5,
+                  scale: 0.94,
+                },
+                {
+                  autoAlpha: 1,
+                  xPercent: -50,
+                  yPercent: -57,
+                  rotation: -1.5,
+                  scale: 1,
+                  duration: 0.75,
+                },
+                "frames+=0.24"
+              )
+              .fromTo(
+                frameBottom,
+                {
+                  autoAlpha: 0,
+                  xPercent: -50,
+                  yPercent: 120,
+                  rotation: 5,
+                  scale: 0.94,
+                },
+                {
+                  autoAlpha: 1,
+                  xPercent: -50,
+                  yPercent: -43,
+                  rotation: 1.5,
+                  scale: 1,
+                  duration: 0.75,
+                },
+                "frames+=0.36"
+              )
+              .to(
+                shadow,
+                {
+                  opacity: 0.54,
+                  scaleX: 0.92,
+                  duration: 0.9,
+                },
+                "frames+=0.18"
+              )
+              .fromTo(
+                socket,
+                {
+                  autoAlpha: 0,
+                  scale: 0.82,
+                },
+                {
+                  autoAlpha: 1,
+                  scale: 1,
+                  duration: 0.25,
+                  ease: "power2.out",
+                },
+                1
+              )
+              .addLabel("lockDrop", 1.3)
+              .fromTo(
+                lockModule,
+                {
+                  autoAlpha: 0,
+                  yPercent: -135,
+                  scale: 0.96,
+                },
+                {
+                  autoAlpha: 1,
+                  yPercent: 0,
+                  scale: 1,
+                  duration: 0.8,
+                  ease: "power3.inOut",
+                },
+                "lockDrop"
+              )
+              .addLabel("lockClose", 2.1)
+              .to(
+                shackle,
+                {
+                  x: 0,
+                  y: 0,
+                  rotation: 0,
+                  duration: 0.4,
+                  ease: "power2.inOut",
+                },
+                "lockClose"
+              )
+              .addLabel("embed", 2.5)
+              .to(
+                lockModule,
+                {
+                  y: 24,
+                  scale: 0.92,
+                  duration: 0.3,
+                  ease: "power3.in",
+                },
+                "embed"
+              )
+              .to(
+                socket,
+                {
+                  opacity: 0.72,
+                  scale: 0.92,
+                  duration: 0.3,
+                  ease: "power3.in",
+                },
+                "embed"
+              )
+              .to(
+                shadow,
+                {
+                  opacity: 0.78,
+                  scaleX: 1.04,
+                  duration: 0.3,
+                  ease: "power2.in",
+                },
+                "embed"
+              )
+              .addLabel("resolve", 2.8)
+              .to(
+                assemblyLayers,
+                {
+                  autoAlpha: 0,
+                  duration: 0.25,
+                  ease: "power1.inOut",
+                },
+                "resolve"
+              )
+              .fromTo(
+                finalLogo,
+                {
+                  autoAlpha: 0,
+                  scale: 0.992,
+                },
+                {
+                  autoAlpha: 1,
+                  scale: 1,
+                  duration: 0.25,
+                  ease: "power1.inOut",
+                },
+                "resolve"
+              )
+              .to({}, { duration: 1.2 });
+
+            return nextTimeline;
+          };
+
+          const media = gsap.matchMedia();
+
+          media.add(
+            {
+              fullMotion: "(prefers-reduced-motion: no-preference)",
+              reduceMotion: "(prefers-reduced-motion: reduce)",
+            },
+            context => {
+              const { reduceMotion } = context.conditions;
+              timeline = buildTimeline({ reducedMotion: reduceMotion });
+
+              if (reduceMotion) {
+                showFinalState();
+              } else {
+                timeline.play(0);
+              }
+
+              const replay = () => {
+                timeline.restart(true);
+              };
+
+              replayButton.addEventListener("click", replay);
+
+              return () => {
+                replayButton.removeEventListener("click", replay);
+                timeline.kill();
+                timeline = null;
+              };
+            }
+          );
+        });
+
+        preload.src = assetUrl;
+      })();
+    </script>
+  </body>
+</html>
