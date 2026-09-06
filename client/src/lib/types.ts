@@ -1,5 +1,18 @@
 /** Data model only — visual decisions live in Home.tsx under the "加密索引库" design direction. */
-export type AppLanguage = "zh-CN" | "en";
+export type AppLanguage =
+  | "zh-CN"
+  | "zh-TW"
+  | "en"
+  | "ja"
+  | "ko"
+  | "ru"
+  | "fr"
+  | "vi"
+  | "es"
+  | "it"
+  | "pt"
+  | "fi"
+  | "fil";
 
 export type VaultGroup = {
   id: string;
@@ -8,13 +21,21 @@ export type VaultGroup = {
   createdAt: string;
 };
 
+export type VaultEmail = {
+  value: string;
+  isPrimary: boolean;
+  showOnHome: boolean;
+};
+
 export type VaultAccount = {
   id: string;
   name: string;
   email: string;
+  emails: VaultEmail[];
   password: string;
   totpSecret: string;
   groupId: string;
+  note: string;
   avatarUrl?: string;
   githubCreatedAt?: string;
   createdAt: string;

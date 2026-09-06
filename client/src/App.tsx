@@ -4,6 +4,7 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import TitleBar from "./components/TitleBar";
+import { LanguageProvider } from "./contexts/LanguageContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 
@@ -24,6 +25,7 @@ function Router() {
 function App() {
   return (
     <ErrorBoundary>
+      <LanguageProvider>
       <ThemeProvider
         defaultTheme="dark"
         // switchable
@@ -33,13 +35,14 @@ function App() {
               window height and every screen scrolls inside this column. */}
           <div className="flex h-screen flex-col overflow-hidden bg-[#08080a]">
             <TitleBar />
-            <div className="relative min-h-0 flex-1 overflow-y-auto">
+            <div className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto">
               <Router />
             </div>
           </div>
           <Toaster />
         </TooltipProvider>
       </ThemeProvider>
+      </LanguageProvider>
     </ErrorBoundary>
   );
 }

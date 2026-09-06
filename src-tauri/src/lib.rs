@@ -2,10 +2,11 @@ mod backup;
 mod quick_unlock;
 mod storage;
 mod vault;
+mod windows_consent;
 
 use std::{path::PathBuf, sync::Mutex, thread, time::Duration};
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
@@ -80,6 +81,17 @@ struct ImportPreview {
     group_count: usize,
     created_at: String,
 }
+
+/// A forgotten master password is unrecoverable by design, so "reset" means:
+/// verify identity, snapshot the encrypted vault, then wipe the local copy.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ResetOutcome {
+    backup_path: String,
+    verified_by: String,
+}
+
+const RESET_ACKNOWLEDGMENT_PHRASE: &str = "永久重置";
 
 fn state_lock<'a>(
     state: &'a State<'_, AppSecurityState>,
@@ -286,6 +298,37 @@ fn unlock_with_totp(
 }
 
 #[tauri::command]
+fn verify_totp_for_action(
+    app: AppHandle,
+    state: State<'_, AppSecurityState>,
+    code: String,
+) -> Result<(), String> {
+    let security = state_lock(&state)?;
+    let session = security
+        .unlocked
+        .as_ref()
+        .ok_or_else(|| "Unlock the vault before confirming this action".to_string())?;
+    let _ = quick_unlock::verify(&app, &session.envelope.vault_id, &code)?;
+    Ok(())
+}
+
+/// Destructive-action confirmation for vaults WITHOUT quick unlock (2FA):
+/// the current master password plays the same "prove it's really the owner" role.
+#[tauri::command]
+fn verify_password_for_action(
+    state: State<'_, AppSecurityState>,
+    password: String,
+) -> Result<(), String> {
+    let password = Zeroizing::new(password);
+    let security = state_lock(&state)?;
+    let session = security
+        .unlocked
+        .as_ref()
+        .ok_or_else(|| "Unlock the vault before confirming this action".to_string())?;
+    verify_password(&session.envelope, &session.data_key, &password)
+}
+
+#[tauri::command]
 fn lock_vault(state: State<'_, AppSecurityState>) -> Result<(), String> {
     let mut security = state_lock(&state)?;
     security.unlocked = None;
@@ -395,6 +438,85 @@ fn disable_totp(
         .ok_or_else(|| "Unlock the vault before changing quick unlock".to_string())?;
     verify_password(&session.envelope, &session.data_key, &current_password)?;
     quick_unlock::disable(&app)
+}
+
+#[tauri::command]
+fn check_windows_hello() -> Result<windows_consent::HelloAvailability, String> {
+    windows_consent::check_availability()
+}
+
+/// Identity is verified inside this command — never in a separate call — so the
+/// vault cannot be wiped through any code path that skipped the OS gate.
+#[tauri::command]
+async fn reset_vault(
+    app: AppHandle,
+    state: State<'_, AppSecurityState>,
+    acknowledgment: Option<String>,
+) -> Result<ResetOutcome, String> {
+    let verified_by = tauri::async_runtime::spawn_blocking(move || {
+        verify_reset_consent(acknowledgment.as_deref())
+    })
+    .await
+    .map_err(|_| "The reset task could not be started".to_string())??;
+
+    // Snapshot the still-encrypted envelope first: if the backup fails, the
+    // vault file must stay exactly as it was.
+    let backup_path = backup_reset_snapshot(&app)?;
+
+    let mut security = state_lock(&state)?;
+    storage::remove_if_exists(&vault_path(&app)?)?;
+    quick_unlock::disable(&app)?;
+    *security = SecurityState::default();
+    Ok(ResetOutcome {
+        backup_path,
+        verified_by: verified_by.to_string(),
+    })
+}
+
+fn verify_reset_consent(acknowledgment: Option<&str>) -> Result<&'static str, String> {
+    match windows_consent::check_availability()? {
+        windows_consent::HelloAvailability::Available => {
+            if windows_consent::request_verification("验证 Windows 身份后才能重置 Github Auth")? {
+                Ok("windowsHello")
+            } else {
+                Err("Windows 身份验证未通过，已取消重置".to_string())
+            }
+        }
+        // No usable Windows Hello on this device: fall back to the typed phrase.
+        _ => match acknowledgment {
+            Some(phrase) if phrase.trim() == RESET_ACKNOWLEDGMENT_PHRASE => Ok("acknowledgment"),
+            _ => Err(format!(
+                "此电脑未配置 Windows Hello，请输入「{RESET_ACKNOWLEDGMENT_PHRASE}」确认后重试"
+            )),
+        },
+    }
+}
+
+fn backup_reset_snapshot(app: &AppHandle) -> Result<String, String> {
+    let contents = read_limited(&vault_path(app)?, MAX_VAULT_BYTES)?
+        .ok_or_else(|| "本地没有可重置的保管库".to_string())?;
+    let settings = backup::load_settings(app)?;
+    let directory = match settings.validate() {
+        Ok(directory) => directory,
+        Err(_) => storage::default_backup_dir(app)?,
+    };
+    // v2 vaults ride the standard backup container; anything else (e.g. a legacy
+    // v1 file) is copied verbatim so a reset can never destroy the only copy.
+    let snapshot = match String::from_utf8(contents.clone())
+        .map_err(|_| "本地保管库不是有效的文本".to_string())
+        .and_then(|text| parse_v2(&text))
+    {
+        Ok(envelope) => backup::write_to_directory(&directory, &envelope, BackupKind::Reset)?,
+        Err(_) => {
+            let legacy = directory.join(format!(
+                "github-auth-reset-{}-legacy.encrypted.json",
+                Local::now().format("%Y%m%d-%H%M%S")
+            ));
+            storage::atomic_write(&legacy, &contents)?;
+            legacy
+        }
+    };
+    Ok(snapshot.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
@@ -566,12 +688,16 @@ pub fn run() {
             confirm_initial_totp,
             unlock_with_password,
             unlock_with_totp,
+            verify_totp_for_action,
+            verify_password_for_action,
             lock_vault,
             save_vault_payload,
             change_master_password,
             begin_totp_rebind,
             confirm_totp_rebind,
             disable_totp,
+            check_windows_hello,
+            reset_vault,
             get_backup_settings,
             update_backup_settings,
             choose_backup_directory,

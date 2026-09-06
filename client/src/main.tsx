@@ -12,6 +12,17 @@ if (!isTauriRuntime && "serviceWorker" in navigator) {
   });
 }
 
+if (isTauriRuntime) {
+  // The desktop app owns its context menus (account/group menus); the WebView2
+  // default menu (back/refresh/save-as/print) is browser noise. Text fields keep
+  // the native menu so cut/copy/paste still works there.
+  document.addEventListener("contextmenu", event => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("input, textarea, [contenteditable='true']")) return;
+    event.preventDefault();
+  });
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />

@@ -9,8 +9,18 @@ import type {
   VaultStatus,
 } from "./types";
 
+export type ResetOutcome = {
+  backupPath: string;
+  verifiedBy: "windowsHello" | "acknowledgment";
+};
+
 export const vaultApi = {
   getStatus: () => invoke<VaultStatus>("get_vault_status"),
+  checkWindowsHello: () => invoke<"available" | "notConfigured" | "unavailable">("check_windows_hello"),
+  resetVault: (acknowledgment?: string | null) =>
+    invoke<ResetOutcome>("reset_vault", {
+      acknowledgment: acknowledgment ?? null,
+    }),
   beginInitialization: (password: string) =>
     invoke<void>("begin_initialization", { password }),
   cancelInitialization: () => invoke<void>("cancel_initialization"),
@@ -23,6 +33,10 @@ export const vaultApi = {
     invoke<UnlockView>("unlock_with_password", { password }),
   unlockWithTotp: (code: string) =>
     invoke<UnlockView>("unlock_with_totp", { code }),
+  verifyTotpForAction: (code: string) =>
+    invoke<void>("verify_totp_for_action", { code }),
+  verifyPasswordForAction: (password: string) =>
+    invoke<void>("verify_password_for_action", { password }),
   lock: () => invoke<void>("lock_vault"),
   savePayload: (payload: VaultPayload) =>
     invoke<void>("save_vault_payload", { payload }),

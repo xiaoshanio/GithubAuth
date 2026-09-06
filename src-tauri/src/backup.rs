@@ -56,6 +56,7 @@ pub enum BackupKind {
     Automatic,
     Manual,
     BeforeReplace,
+    Reset,
 }
 
 impl BackupSettings {
@@ -158,6 +159,7 @@ fn file_name(kind: BackupKind) -> String {
         BackupKind::Automatic => AUTOMATIC_PREFIX,
         BackupKind::Manual => "github-auth-",
         BackupKind::BeforeReplace => "github-auth-before-replace-",
+        BackupKind::Reset => "github-auth-reset-",
     };
     format!("{prefix}{}.ghauth-backup", file_stamp())
 }
@@ -401,9 +403,11 @@ mod tests {
                 id: format!("{prefix}-account"),
                 name: format!("{prefix}-user"),
                 email: String::new(),
+                emails: Vec::new(),
                 password: "password".to_string(),
                 totp_secret: String::new(),
                 group_id: format!("{prefix}-group"),
+                note: String::new(),
                 avatar_url: None,
                 github_created_at: None,
                 created_at: "2026-08-15T00:00:00Z".to_string(),

@@ -2,6 +2,12 @@
 
 Local encrypted GitHub account vault packaged for Windows with Tauri 2.
 
+**Read this in other languages:** [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md) · [日本語](README.ja.md) · [Русский](README.ru.md) · [Français](README.fr.md) · [Tiếng Việt](README.vi.md) · [한국어](README.ko.md)
+
+## Interface languages
+
+The app ships with 13 interface languages: Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Russian, French, Vietnamese, Spanish, Italian, Portuguese, Finnish, and Filipino. On first launch the interface follows the operating system language; the language can be changed at any time in Vault settings, and the choice is remembered.
+
 ## Requirements
 
 - Windows 10 or Windows 11

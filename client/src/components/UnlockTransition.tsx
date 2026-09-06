@@ -1,5 +1,6 @@
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const LOGO = "./assets/github-vault-logo_fdf70cb3.png";
@@ -12,6 +13,7 @@ export default function UnlockTransition({
   onComplete: () => void;
 }) {
   const root = useRef<HTMLElement>(null);
+  const { t } = useLanguage();
   const completed = useRef(false);
   const onCompleteRef = useRef(onComplete);
   const [logoReady, setLogoReady] = useState(false);
@@ -296,7 +298,7 @@ export default function UnlockTransition({
     <main
       ref={root}
       role="status"
-      aria-label="正在安全解锁 Github Auth"
+      aria-label={t.app.unlocking}
       className="screen-fill relative grid place-items-center overflow-hidden bg-[#17181d]"
       style={{
         backgroundImage:

@@ -38,15 +38,29 @@ pub struct VaultAccount {
     pub id: String,
     pub name: String,
     pub email: String,
+    #[serde(default)]
+    pub emails: Vec<VaultEmail>,
     pub password: String,
     pub totp_secret: String,
     pub group_id: String,
+    #[serde(default)]
+    pub note: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub avatar_url: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub github_created_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct VaultEmail {
+    pub value: String,
+    #[serde(default)]
+    pub is_primary: bool,
+    #[serde(default)]
+    pub show_on_home: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
@@ -420,11 +434,17 @@ fn unlock_legacy(contents: &str, password: &str) -> Result<UnlockedVault, String
     Ok(migrated)
 }
 
+/// Languages accepted in vault settings; must stay in sync with the client's
+/// `AppLanguage` union in client/src/lib/types.ts.
+pub const SUPPORTED_LANGUAGES: [&str; 13] = [
+    "zh-CN", "zh-TW", "en", "ja", "ko", "ru", "fr", "vi", "es", "it", "pt", "fi", "fil",
+];
+
 pub fn validate_payload(payload: &VaultPayload) -> Result<(), String> {
     if payload.groups.len() > 10_000 || payload.accounts.len() > 100_000 {
         return Err("Vault payload contains too many records".to_string());
     }
-    if !matches!(payload.settings.language.as_str(), "zh-CN" | "en")
+    if !SUPPORTED_LANGUAGES.contains(&payload.settings.language.as_str())
         || payload.settings.clipboard_clear_seconds > 120
     {
         return Err("Vault settings are invalid".to_string());
@@ -444,9 +464,11 @@ pub fn validate_payload(payload: &VaultPayload) -> Result<(), String> {
             || account.name.is_empty()
             || account.name.len() > 256
             || account.email.len() > 512
+            || account.emails.len() > 32
             || account.password.len() > 16_384
             || account.totp_secret.len() > 4096
             || account.group_id.len() > 128
+            || account.note.len() > 4096
             // The avatar is rendered as an image source, so bound its length and
             // require an https origin instead of trusting whatever a backup carries.
             || account
@@ -477,6 +499,15 @@ pub fn validate_payload(payload: &VaultPayload) -> Result<(), String> {
         return Err("Vault account IDs must be unique".to_string());
     }
     if payload.accounts.iter().any(|account| {
+        account.emails.iter().any(|email| email.value.trim().is_empty() || email.value.len() > 512)
+            || account.emails.iter().filter(|email| email.is_primary).count() > 1
+            || account.emails.iter().filter(|email| email.show_on_home).count() > 2
+            || (!account.emails.is_empty() && account.emails.iter().filter(|email| email.is_primary).count() != 1)
+            || (!account.emails.is_empty() && !account.emails.iter().any(|email| email.show_on_home && email.is_primary))
+    }) {
+        return Err("Account email settings are invalid".to_string());
+    }
+    if payload.accounts.iter().any(|account| {
         !account.group_id.is_empty() && !group_ids.contains(account.group_id.as_str())
     }) {
         return Err("Vault account references an unknown group".to_string());
@@ -503,9 +534,11 @@ mod tests {
                 id: "account-1".to_string(),
                 name: "octocat".to_string(),
                 email: "secret@example.com".to_string(),
+                emails: vec![VaultEmail { value: "secret@example.com".to_string(), is_primary: true, show_on_home: true }],
                 password: "never-store-this-in-plaintext".to_string(),
                 totp_secret: "JBSWY3DPEHPK3PXP".to_string(),
                 group_id: "group-1".to_string(),
+                note: String::new(),
                 avatar_url: None,
                 github_created_at: None,
                 created_at: "2026-08-15T00:00:00.000Z".to_string(),

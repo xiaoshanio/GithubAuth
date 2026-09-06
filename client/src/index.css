@@ -55,7 +55,10 @@
   --chart-5: oklch(0.3 0.03 300);
   --radius: 0.9rem;
   /* Height of the custom window chrome rendered by TitleBar.tsx. */
-  --titlebar-height: 38px;
+  --titlebar-height: 54px;
+  /* Veil-style shell geometry shared by the toolbar brand and the vault sidebar. */
+  --shell-sidebar: 250px;
+  --shell-sidebar-collapsed: 64px;
   --background: oklch(0.075 0.004 286);
   --foreground: oklch(0.93 0.004 286);
   --card: oklch(0.125 0.005 286);
@@ -85,6 +88,17 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* Desktop vault UI: the light WebView2 scrollbar is visual noise on the graphite
+     theme. Scrolling itself (wheel, drag, keyboard) is untouched. */
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
   body {
     @apply bg-background text-foreground;
     font-family: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", Arial, sans-serif;
@@ -112,6 +126,24 @@
     min-height: calc(100vh - var(--titlebar-height));
   }
 
+  /* Toolbar brand and its bottom hairline track the sidebar width, so the chrome
+     reads as one column above navigation (below lg the sidebar is hidden). */
+  .shell-brand {
+    width: var(--shell-brand-width, var(--shell-sidebar));
+    transition: width 280ms ease;
+  }
+  .shell-topline {
+    left: var(--shell-brand-width, var(--shell-sidebar));
+  }
+  @media (max-width: 1023px) {
+    .shell-brand {
+      width: auto;
+    }
+    .shell-topline {
+      left: 0;
+    }
+  }
+
   /**
    * Custom container utility that centers content and adds responsive padding.
    *
@@ -133,7 +165,13 @@
     padding-right: 1rem;
   }
 
-  .flex {
+  /**
+   * Flex items default to `min-width/min-height: auto`, so long content can push a
+   * flex container past its parent. `:where()` keeps that safety net at zero
+   * specificity: a sizing class on the same element — `.screen-fill`, a Tailwind
+   * `min-h-*` utility — still wins instead of being silently overridden.
+   */
+  :where(.flex) {
     min-height: 0;
     min-width: 0;
   }
@@ -165,8 +203,56 @@
     box-shadow: 0 18px 50px oklch(0 0 0 / 20%);
   }
 
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   .grain {
     background-image: radial-gradient(oklch(1 0 0 / 7%) 0.55px, transparent 0.55px);
     background-size: 7px 7px;
+  }
+
+  .loading-spinner {
+    transform-origin: center;
+    transform-box: fill-box;
+    animation:
+      loading-spinner-rotate 0.9s linear infinite,
+      loading-spinner-breathe 1.8s ease-in-out infinite;
+  }
+
+  .loading-spinner__track {
+    opacity: 0.16;
+  }
+
+  .loading-spinner__arc {
+    opacity: 0.96;
+  }
+
+  @keyframes loading-spinner-rotate {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes loading-spinner-breathe {
+    0%,
+    100% {
+      opacity: 0.78;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .loading-spinner {
+      animation: none;
+      opacity: 0.86;
+    }
   }
 }

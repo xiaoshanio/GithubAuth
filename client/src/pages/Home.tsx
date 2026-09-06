@@ -2,8 +2,7 @@
 import { Button } from "@/components/ui/button";
 import AuthScreen from "@/components/AuthScreen";
 import UnlockTransition from "@/components/UnlockTransition";
-import VaultSettingsDialog from "@/components/VaultSettingsDialog";
-import VaultMark from "@/components/VaultMark";
+import VaultSettingsPage from "@/components/VaultSettingsPage";
 import {
   Dialog,
   DialogContent,
@@ -29,18 +28,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import {
   CirclePlus,
   Clipboard,
   Copy,
   Edit3,
+  Folder,
   FolderPlus,
   KeyRound,
   Lock,
   Menu,
+  PanelLeft,
+  PanelLeftClose,
   Plus,
-  Search,
   Settings2,
   ShieldCheck,
   TimerReset,
@@ -52,14 +54,27 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { generateTotp, getTotpSecondsLeft } from "@/lib/totp";
+import {
+  registerClearGroupFilter,
+  registerCreateAccount,
+  setShellGroupHint,
+  setShellSearch,
+  setShellSearchPlaceholder,
+  setShellUnlocked,
+  sidebarShell,
+  useShellSearch,
+  useSidebarCollapsed,
+} from "@/lib/shellStore";
 import type {
-  AppLanguage,
   UnlockView,
   VaultAccount,
+  VaultEmail,
   VaultGroup,
   VaultPayload,
   VaultStatus,
 } from "@/lib/types";
+import type { Dictionary } from "@/lib/i18n";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { vaultApi } from "@/lib/vaultApi";
 
 const QR_TEXTURE = "./assets/github-vault-qr-panel_14bbe081.jpg";
@@ -70,264 +85,37 @@ type AccountDraft = Omit<
   "id" | "createdAt" | "updatedAt" | "avatarUrl" | "githubCreatedAt"
 >;
 
+const normalizeEmails = (
+  account: Pick<VaultAccount, "email" | "emails">
+): VaultEmail[] => {
+  const emails = Array.isArray(account.emails)
+    ? account.emails.filter(item => item?.value?.trim())
+    : [];
+  if (emails.length) {
+    const primaryIndex = Math.max(
+      0,
+      emails.findIndex(item => item.isPrimary)
+    );
+    return emails.map((item, index) => ({
+      value: item.value.trim(),
+      isPrimary: index === primaryIndex,
+      showOnHome: index === primaryIndex ? true : Boolean(item.showOnHome),
+    }));
+  }
+  return account.email.trim()
+    ? [{ value: account.email.trim(), isPrimary: true, showOnHome: true }]
+    : [];
+};
+
 const freshDraft = (groupId = ""): AccountDraft => ({
   name: "",
   email: "",
+  emails: [{ value: "", isPrimary: true, showOnHome: true }],
   password: "",
   totpSecret: "",
   groupId,
+  note: "",
 });
-
-const copy = {
-  "zh-CN": {
-    app: "Github Auth",
-    index: "账户索引",
-    localIndex: "本地索引",
-    localOnly: "仅本地",
-    encryptedIndex: "加密索引",
-    identity: "身份资料",
-    record: "保管记录",
-    lockedState: "已锁定",
-    keyDerivation: "密钥衍生",
-    encryption: "本机加密",
-    deviceOnly: "仅此设备",
-    noGroup: "未分组",
-    profile: "资料",
-    accountAge: "账户年龄",
-    noTwoFactor: "未配置双重验证",
-    twoFactorReady: "双重验证就绪",
-    currentCode: "当前验证码",
-    nextCode: "下一组验证码",
-    copyCodeTip: "单击卡片复制当前验证码",
-    deleteGroup: "删除分组",
-    deleteGroupConfirm: "删除该分组后，组内账户将保留为未分组。是否继续？",
-    groupDeleted: "分组已删除，账户已保留为未分组。",
-    processing: "处理中…",
-    storageLoading: "正在读取本地加密保管库…",
-    storageFailed: "无法读取本地加密保管库，请重新启动应用。",
-    vaultCreated: "加密保管库已创建。",
-    missingCredentials: "请输入账户名称和密码。",
-    clipboardUnavailable: "浏览器未允许访问剪贴板。",
-    groupCreated: "分组已创建。",
-    settingsUpdated: "设置已更新。",
-    accountSaved: "账户已加密保存。",
-    deleteConfirm: "确定要删除此账户吗？",
-    settingsHint:
-      "所有保管库内容均在本机加密。退出或点击锁定会清除内存中的解密数据。",
-    preferences: "偏好设置",
-    security: "安全设置",
-    footerEncryption: "本机加密",
-    footerNoSync: "不同步云端",
-    footerNoTransfer: "不传输机密",
-    all: "全部账户",
-    groups: "分组",
-    addGroup: "新建分组",
-    group: "分组",
-    add: "添加账户",
-    search: "搜索名称、邮箱、分组或创建日期…",
-    local: "本机加密",
-    publicOnly: "仅公开资料联网",
-    locked: "锁定",
-    settings: "设置",
-    noAccounts: "此索引中还没有账户",
-    noAccountsHint:
-      "添加第一个账户，邮箱、密码和双重验证密钥将只保存在此设备的加密保管库中。",
-    addFirst: "添加第一个账户",
-    account: "账户",
-    accounts: "账户",
-    secure: "已加密",
-    totp: "双重验证",
-    created: "创建于",
-    age: "账户年龄",
-    unknown: "待查询",
-    unlockTitle: "解锁加密账户索引",
-    unlockHint: "保管库仅存在于这台设备。主密码不会被保存或传输。",
-    masterPassword: "主密码",
-    confirmPassword: "确认主密码",
-    createVault: "创建加密保管库",
-    unlock: "解锁保管库",
-    firstTitle: "初始化本地账户索引",
-    firstHint:
-      "使用至少 12 位主密码生成本机密钥。主密码无法恢复，也不会离开此设备。",
-    invalidPassword: "主密码至少应包含 12 位字符。",
-    mismatch: "两次输入的主密码不一致。",
-    wrongPassword: "无法解锁。请检查主密码。",
-    accountTitle: "添加代码托管身份",
-    editTitle: "编辑代码托管身份",
-    accountHint:
-      "只有用户名会被用于查询公开头像和账户创建日期；邮箱、密码和双重验证密钥永不离开本机。",
-    username: "代码托管用户名",
-    email: "邮箱",
-    password: "密码",
-    twoFactor: "双重验证密钥",
-    importQr: "导入二维码图片",
-    importQrHint: "二维码仅在浏览器内解析，不会上传。",
-    save: "加密保存",
-    cancel: "取消",
-    groupName: "分组名称",
-    createGroup: "创建分组",
-    groupHint: "分组用于将账户拆分显示，例如团队、个人或归档。",
-    copyName: "复制用户名",
-    copyEmail: "复制邮箱",
-    copyPassword: "复制密码",
-    copyTotp: "复制双重验证码",
-    edit: "编辑资料",
-    delete: "删除账户",
-    copied: "已复制",
-    copiedHint: "剪贴板将按设置在 30 秒后尝试清空。",
-    copiedPassword: "密码已复制",
-    copiedCode: "双重验证码已复制",
-    unableCode: "当前账户没有可用的双重验证密钥。",
-    menuHint: "右键账户卡片可打开安全复制菜单。",
-    vaultSettings: "保管库设置",
-    language: "界面语言",
-    clipboard: "复制后自动清空剪贴板",
-    seconds: "秒",
-    disabled: "关闭",
-    changeMaster: "更改主密码",
-    oldPassword: "当前主密码",
-    newPassword: "新主密码",
-    export: "导出加密备份",
-    exportHint: "导出的文件仍为本机加密格式，不含可读的账户资料。",
-    currentData: "当前数据",
-    profileFailed: "未能查询公开头像，账户已安全保存。",
-    qrImported: "已从本地二维码导入双重验证密钥。",
-    qrFailed: "未从该图片识别到有效二维码。",
-    updated: "已加密更新",
-    deleted: "账户已从加密索引中移除。",
-    masterChanged: "主密码已更改，数据已重新加密。",
-    backupDownloaded: "加密备份已下载。",
-    noResults: "没有匹配的索引项",
-    noResultsHint: "尝试使用账户名、邮箱、分组、公开创建日期或账户年龄搜索。",
-  },
-  en: {
-    app: "Github Auth",
-    index: "Account Index",
-    localIndex: "Local index",
-    localOnly: "Local only",
-    encryptedIndex: "Encrypted index",
-    identity: "Identity record",
-    record: "Vault record",
-    lockedState: "Locked",
-    keyDerivation: "Key derivation",
-    encryption: "Local encryption",
-    deviceOnly: "This device only",
-    noGroup: "No group",
-    profile: "Profile",
-    accountAge: "Account age",
-    noTwoFactor: "No 2FA",
-    twoFactorReady: "2FA ready",
-    currentCode: "Current code",
-    nextCode: "Next code",
-    copyCodeTip: "Click the card to copy the current code",
-    deleteGroup: "Delete group",
-    deleteGroupConfirm:
-      "Accounts in this group will be kept ungrouped. Continue?",
-    groupDeleted: "Group deleted. Accounts are now ungrouped.",
-    processing: "Processing…",
-    storageLoading: "Loading the local encrypted vault…",
-    storageFailed:
-      "Unable to read the local encrypted vault. Restart the application.",
-    vaultCreated: "Encrypted vault created.",
-    missingCredentials: "Enter an account name and password.",
-    clipboardUnavailable: "Browser clipboard access was not granted.",
-    groupCreated: "Group created.",
-    settingsUpdated: "Settings updated.",
-    accountSaved: "Account encrypted and saved.",
-    deleteConfirm: "Delete this account?",
-    settingsHint:
-      "All vault content is encrypted on this device. Leaving or locking clears decrypted data from memory.",
-    preferences: "Preferences",
-    security: "Security",
-    footerEncryption: "Local encryption",
-    footerNoSync: "No cloud sync",
-    footerNoTransfer: "No secret transfer",
-    all: "All accounts",
-    groups: "Groups",
-    addGroup: "New group",
-    group: "Group",
-    add: "Add account",
-    search: "Search name, email, group or creation date…",
-    local: "Local AES-256 encryption",
-    publicOnly: "Only public profile lookups",
-    locked: "Lock",
-    settings: "Settings",
-    noAccounts: "This index has no accounts yet",
-    noAccountsHint:
-      "Add your first GitHub identity. Email, password, and 2FA remain only in this device’s encrypted vault.",
-    addFirst: "Add first account",
-    account: "account",
-    accounts: "accounts",
-    secure: "encrypted",
-    totp: "2FA",
-    created: "Created",
-    age: "Account age",
-    unknown: "Pending lookup",
-    unlockTitle: "Unlock encrypted account index",
-    unlockHint:
-      "This vault only lives on this device. Your master password is never stored or transmitted.",
-    masterPassword: "Master password",
-    confirmPassword: "Confirm master password",
-    createVault: "Create encrypted vault",
-    unlock: "Unlock vault",
-    firstTitle: "Initialize local account index",
-    firstHint:
-      "Use a master password of at least 12 characters to generate the device key. It cannot be recovered or leave this device.",
-    invalidPassword: "Use a master password with at least 12 characters.",
-    mismatch: "The master passwords do not match.",
-    wrongPassword: "Unable to unlock. Check your master password.",
-    accountTitle: "Add GitHub identity",
-    editTitle: "Edit GitHub identity",
-    accountHint:
-      "Only the username can query a public avatar and GitHub creation date. Email, password, and 2FA never leave this device.",
-    username: "GitHub username",
-    email: "Email",
-    password: "Password",
-    twoFactor: "2FA Base32 secret",
-    importQr: "Import QR image",
-    importQrHint: "The image is decoded in your browser and is never uploaded.",
-    save: "Encrypt & save",
-    cancel: "Cancel",
-    groupName: "Group name",
-    createGroup: "Create group",
-    groupHint:
-      "Groups separate account cards, such as team, personal, or archive.",
-    copyName: "Copy username",
-    copyEmail: "Copy email",
-    copyPassword: "Copy password",
-    copyTotp: "Copy 2FA code",
-    edit: "Edit identity",
-    delete: "Delete account",
-    copied: "Copied",
-    copiedHint: "The clipboard will be cleared after 30 seconds when enabled.",
-    copiedPassword: "Password copied",
-    copiedCode: "2FA code copied",
-    unableCode: "This account has no usable 2FA secret.",
-    menuHint: "Right-click any account card for the secure copy menu.",
-    vaultSettings: "Vault settings",
-    language: "Interface language",
-    clipboard: "Clear clipboard after copying",
-    seconds: "seconds",
-    disabled: "Disabled",
-    changeMaster: "Change master password",
-    oldPassword: "Current master password",
-    newPassword: "New master password",
-    export: "Export encrypted backup",
-    exportHint:
-      "The downloaded file remains AES-GCM encrypted and contains no readable account fields.",
-    currentData: "Current data",
-    profileFailed: "Public avatar lookup failed; the account was safely saved.",
-    qrImported: "2FA secret imported from your local QR image.",
-    qrFailed: "No valid QR code was found in that image.",
-    updated: "Encrypted update saved",
-    deleted: "Account removed from the encrypted index.",
-    masterChanged: "Master password changed and data re-encrypted.",
-    backupDownloaded: "Encrypted backup downloaded.",
-    noResults: "No matching index records",
-    noResultsHint:
-      "Search by account name, email, group, public creation date, or account age.",
-  },
-} as const;
 
 function ageFrom(date?: string) {
   if (!date) return "—";
@@ -340,9 +128,9 @@ function ageFrom(date?: string) {
   return `${Math.floor(days / 365)}y`;
 }
 
-function dateStamp(date?: string) {
+function dateStamp(date: string | undefined, locale: string) {
   if (!date) return "—";
-  return new Intl.DateTimeFormat("zh-CN", {
+  return new Intl.DateTimeFormat(locale, {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -400,20 +188,19 @@ function InitialAvatar({ name, url }: { name: string; url?: string }) {
 
 function AccountCard({
   account,
-  language,
+  t,
   onContext,
   onCopyCode,
   codes,
   secondsLeft,
 }: {
   account: VaultAccount;
-  language: AppLanguage;
+  t: Dictionary["home"];
   onContext: (event: React.MouseEvent, account: VaultAccount) => void;
   onCopyCode: (value: string) => void;
   codes?: { current: string | null; next: string | null };
   secondsLeft: number;
 }) {
-  const cardCopy = copy[language];
   const age = account.githubCreatedAt ? ageFrom(account.githubCreatedAt) : "—";
   const progress = Math.max(5, (secondsLeft / 30) * 100);
   return (
@@ -431,31 +218,38 @@ function AccountCard({
         className="absolute left-0 top-0 h-[3px] bg-violet-400"
         style={{ width: `${progress}%` }}
       />
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <InitialAvatar name={account.name} url={account.avatarUrl} />
-          <div className="min-w-0">
-            <div className="flex items-baseline gap-2">
-              <h3 className="truncate text-xl font-extrabold tracking-[-0.03em] text-white">
-                {account.name}
-              </h3>
-              <span className="mono shrink-0 text-[11px] text-violet-200">
-                {age}
-              </span>
-            </div>
-            <p className="mt-1.5 truncate text-[13px] font-medium text-zinc-500">
-              {account.email || "—"}
-            </p>
+      <div className="flex min-w-0 items-center gap-3">
+        <InitialAvatar name={account.name} url={account.avatarUrl} />
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-2 pr-14">
+            <h3 className="break-all text-xl font-extrabold tracking-[-0.03em] text-white">
+              {account.name}
+            </h3>
+            <span className="mono shrink-0 text-[11px] text-violet-200">
+              {age}
+            </span>
+          </div>
+          <div className="mt-1.5 flex min-w-0 flex-col gap-0.5 text-[13px] font-medium text-zinc-500">
+            {normalizeEmails(account)
+              .filter(item => item.showOnHome)
+              .slice(0, 2)
+              .map(item => (
+                <p key={item.value} className="break-all">
+                  {item.value}
+                </p>
+              ))}
           </div>
         </div>
-        <span className="mono rounded-lg border border-white/[0.08] px-2 py-1 text-[10px] text-zinc-500">
-          {secondsLeft} {language === "zh-CN" ? "秒" : "s"}
-        </span>
       </div>
+      {/* Out of the flex flow so the countdown never squeezes the email block
+          into wrapping — the two never compete for width. */}
+      <span className="mono absolute right-5 top-5 whitespace-nowrap rounded-lg border border-white/[0.08] px-2 py-1 text-[10px] text-zinc-500">
+        {secondsLeft} {t.secondsShort}
+      </span>
       <div className="mt-8 grid grid-cols-2 gap-4 border-t border-white/[0.07] pt-5">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold text-zinc-500">
-            {cardCopy.currentCode}
+            {t.currentCode}
           </p>
           <p className="mono mt-2 truncate text-xl font-bold tracking-[0.08em] text-violet-100">
             {formatCode(codes?.current ?? null)}
@@ -463,7 +257,7 @@ function AccountCard({
         </div>
         <div className="min-w-0 text-right">
           <p className="text-[11px] font-semibold text-zinc-500">
-            {cardCopy.nextCode}
+            {t.nextCode}
           </p>
           <p className="mono mt-2 truncate text-xl font-bold tracking-[0.08em] text-zinc-500">
             {formatCode(codes?.next ?? null)}
@@ -472,11 +266,11 @@ function AccountCard({
       </div>
       <div className="mt-5 flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-zinc-400">
-          <Copy size={12} className="text-violet-300" /> {cardCopy.copyCodeTip}
+          <Copy size={12} className="text-violet-300" /> {t.copyCodeTip}
         </span>
         <span className="inline-flex items-center gap-1.5 text-[11px] text-zinc-600">
           <TimerReset size={12} />{" "}
-          {account.totpSecret ? cardCopy.twoFactorReady : cardCopy.noTwoFactor}
+          {account.totpSecret ? t.twoFactorReady : t.noTwoFactor}
         </span>
       </div>
     </article>
@@ -495,10 +289,53 @@ export default function Home() {
   const [isGroupDialogOpen, setGroupDialogOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [activeGroup, setActiveGroup] = useState("all");
-  const [search, setSearch] = useState("");
+  const search = useShellSearch();
+  const sidebarCollapsed = useSidebarCollapsed();
   const [editing, setEditing] = useState<VaultAccount | null>(null);
   const [draft, setDraft] = useState<AccountDraft>(freshDraft());
   const [groupName, setGroupName] = useState("");
+  const [editingGroup, setEditingGroup] = useState<VaultGroup | null>(null);
+  const [groupContext, setGroupContext] = useState<{
+    x: number;
+    y: number;
+    group: VaultGroup;
+  } | null>(null);
+  const [groupDeleteTarget, setGroupDeleteTarget] = useState<VaultGroup | null>(
+    null
+  );
+  const [deleteGroupWithAccounts, setDeleteGroupWithAccounts] = useState(false);
+  const [deleteVerifySecret, setDeleteVerifySecret] = useState("");
+  const [previewAccount, setPreviewAccount] = useState<VaultAccount | null>(
+    null
+  );
+  const [groupsFlyoutOpen, setGroupsFlyoutOpen] = useState(false);
+  const groupsFlyoutCloseTimer = useRef<number | null>(null);
+
+  // Hover-open flyout: closing is deferred briefly so crossing the gap between
+  // the rail icon and the portaled menu never snaps it shut mid-move.
+  function scheduleGroupsFlyoutClose() {
+    if (groupsFlyoutCloseTimer.current !== null)
+      window.clearTimeout(groupsFlyoutCloseTimer.current);
+    groupsFlyoutCloseTimer.current = window.setTimeout(() => {
+      groupsFlyoutCloseTimer.current = null;
+      setGroupsFlyoutOpen(false);
+    }, 180);
+  }
+
+  function cancelGroupsFlyoutClose() {
+    if (groupsFlyoutCloseTimer.current !== null) {
+      window.clearTimeout(groupsFlyoutCloseTimer.current);
+      groupsFlyoutCloseTimer.current = null;
+    }
+  }
+
+  useEffect(
+    () => () => {
+      if (groupsFlyoutCloseTimer.current !== null)
+        window.clearTimeout(groupsFlyoutCloseTimer.current);
+    },
+    []
+  );
   const [context, setContext] = useState<{
     x: number;
     y: number;
@@ -510,8 +347,7 @@ export default function Home() {
   >({});
   const fileInput = useRef<HTMLInputElement>(null);
 
-  const lang = vault?.settings.language ?? "zh-CN";
-  const t = copy[lang];
+  const { language, t } = useLanguage();
   const totpWindow = Math.floor(now / 30_000);
 
   useEffect(() => {
@@ -569,10 +405,54 @@ export default function Home() {
   }, [vault, totpWindow]);
 
   useEffect(() => {
-    const close = () => setContext(null);
+    const close = () => {
+      setContext(null);
+      setGroupContext(null);
+    };
     window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, []);
+
+  // The top toolbar renders the vault search and create action, so it needs to know
+  // whether the vault screen is active and which dialog opener to call.
+  useEffect(() => {
+    setShellSearchPlaceholder(t.home.search);
+  }, [t.home.search]);
+
+  useEffect(() => {
+    setShellUnlocked(Boolean(vault));
+    if (!vault) setShellSearch("");
+  }, [vault]);
+
+  // The toolbar chip shows which group the index is filtered by.
+  useEffect(() => {
+    if (!vault || activeGroup === "all") {
+      setShellGroupHint(null);
+      return;
+    }
+    const group = vault.groups.find(item => item.id === activeGroup);
+    setShellGroupHint(
+      group ? { id: group.id, name: group.name, color: group.color } : null
+    );
+  }, [vault, activeGroup]);
+
+  useEffect(() => {
+    registerClearGroupFilter(() => selectGroup("all"));
+    return () => registerClearGroupFilter(null);
+  }, []);
+
+  useEffect(() => {
+    if (!vault) return;
+    // Re-registered every render so the opener always sees the active group.
+    registerCreateAccount(openCreateAccount);
+    return () => registerCreateAccount(null);
+  });
+
+  // Picking a group is navigation: it always leaves the settings page.
+  function selectGroup(groupId: string) {
+    setActiveGroup(groupId);
+    setSettingsOpen(false);
+  }
 
   async function persist(next: VaultPayload) {
     await vaultApi.savePayload(next);
@@ -585,21 +465,28 @@ export default function Home() {
 
   const completeUnlock = useCallback(() => {
     if (!pendingUnlock) return;
-    setVault(pendingUnlock.payload);
+    const payload = pendingUnlock.payload;
+    // The vault carries the active UI language so stored settings stay
+    // coherent; the UI itself always follows the LanguageProvider.
+    setVault(
+      payload.settings.language === language
+        ? payload
+        : { ...payload, settings: { ...payload.settings, language } }
+    );
     setQuickUnlockEnabled(pendingUnlock.quickUnlockEnabled);
     setVaultStatus({
       hasVault: true,
       quickUnlockEnabled: pendingUnlock.quickUnlockEnabled,
     });
     setPendingUnlock(null);
-  }, [pendingUnlock]);
+  }, [pendingUnlock, language]);
 
   async function lockVault() {
     await vaultApi.lock().catch(() => undefined);
     setPendingUnlock(null);
     setVault(null);
     setContext(null);
-    setSearch("");
+    setShellSearch("");
     setEditing(null);
     setDraft(freshDraft());
     setTotpCodes({});
@@ -611,13 +498,13 @@ export default function Home() {
   }
 
   async function handleCopy(value: string, label: string) {
-    if (!value) return toast.error(t.unableCode);
+    if (!value) return toast.error(t.home.unableCode);
     try {
       await navigator.clipboard.writeText(value);
       toast.success(label, {
         description: vault?.settings.clipboardClearSeconds
-          ? t.copiedHint.replace(
-              "30",
+          ? t.home.copiedHint.replace(
+              "{seconds}",
               String(vault.settings.clipboardClearSeconds)
             )
           : undefined,
@@ -635,7 +522,7 @@ export default function Home() {
           await navigator.clipboard.writeText("").catch(() => undefined);
         }, seconds * 1_000);
     } catch {
-      toast.error(t.clipboardUnavailable);
+      toast.error(t.home.clipboardUnavailable);
     }
   }
 
@@ -650,16 +537,25 @@ export default function Home() {
     setDraft({
       name: account.name,
       email: account.email,
+      emails: normalizeEmails(account),
       password: account.password,
       totpSecret: account.totpSecret,
       groupId: account.groupId,
+      note: account.note ?? "",
     });
     setAccountDialogOpen(true);
   }
 
+  function openEditGroup(group: VaultGroup) {
+    setEditingGroup(group);
+    setGroupName(group.name);
+    setGroupDialogOpen(true);
+    setGroupContext(null);
+  }
+
   async function saveAccount() {
     if (!vault || !draft.name.trim() || !draft.password)
-      return toast.error(t.missingCredentials);
+      return toast.error(t.home.missingCredentials);
     const timestamp = new Date().toISOString();
     let publicProfile: Pick<VaultAccount, "avatarUrl" | "githubCreatedAt"> =
       editing
@@ -671,10 +567,30 @@ export default function Home() {
     try {
       publicProfile = await queryPublicProfile(draft.name);
     } catch {
-      toast.info(t.profileFailed);
+      toast.info(t.home.profileFailed);
+    }
+    const emails = (draft.emails ?? [])
+      .filter(item => item.value.trim())
+      .map(item => ({ ...item, value: item.value.trim() }));
+    const primaryIndex = Math.max(
+      0,
+      emails.findIndex(item => item.isPrimary)
+    );
+    const normalizedEmails = emails.map((item, index) => ({
+      ...item,
+      isPrimary: emails.length > 0 && index === primaryIndex,
+      showOnHome:
+        emails.length > 0 &&
+        (index === primaryIndex || Boolean(item.showOnHome)),
+    }));
+    if (normalizedEmails.filter(item => item.showOnHome).length > 2) {
+      return toast.error(t.home.maxHomeEmails);
     }
     const account: VaultAccount = {
       ...draft,
+      email: normalizedEmails[primaryIndex]?.value ?? "",
+      emails: normalizedEmails,
+      note: draft.note.trim(),
       totpSecret: normalizeTotp(draft.totpSecret),
       ...publicProfile,
       id: editing?.id ?? crypto.randomUUID(),
@@ -687,45 +603,78 @@ export default function Home() {
     await persist({ ...vault, accounts });
     setAccountDialogOpen(false);
     setEditing(null);
-    toast.success(editing ? t.updated : t.accountSaved);
+    toast.success(editing ? t.home.updated : t.home.accountSaved);
   }
 
   async function createGroup() {
     if (!vault || !groupName.trim()) return;
-    const group: VaultGroup = {
-      id: crypto.randomUUID(),
-      name: groupName.trim(),
-      color: "#A855F7",
-      createdAt: new Date().toISOString(),
-    };
-    await persist({ ...vault, groups: [...vault.groups, group] });
+    const group: VaultGroup = editingGroup
+      ? { ...editingGroup, name: groupName.trim() }
+      : {
+          id: crypto.randomUUID(),
+          name: groupName.trim(),
+          color: "#A855F7",
+          createdAt: new Date().toISOString(),
+        };
+    await persist({
+      ...vault,
+      groups: editingGroup
+        ? vault.groups.map(item => (item.id === group.id ? group : item))
+        : [...vault.groups, group],
+    });
     setActiveGroup(group.id);
     setGroupName("");
+    setEditingGroup(null);
     setGroupDialogOpen(false);
-    toast.success(t.groupCreated);
+    toast.success(editingGroup ? t.home.groupUpdated : t.home.groupCreated);
   }
 
-  async function removeGroup(group: VaultGroup) {
-    if (!vault || !window.confirm(t.deleteGroupConfirm)) return;
-    const accounts = vault.accounts.map(account =>
-      account.groupId === group.id ? { ...account, groupId: "" } : account
-    );
+  async function removeGroup(group: VaultGroup, withAccounts = false) {
+    if (!vault) return;
+    if (withAccounts) {
+      // Destructive confirmation: quick unlock (2FA) when configured, otherwise
+      // the current master password plays the same role.
+      const secret = deleteVerifySecret.trim();
+      if (!secret)
+        return toast.error(
+          quickUnlockEnabled
+            ? t.home.totpRequired
+            : t.home.masterPasswordRequired
+        );
+      try {
+        if (quickUnlockEnabled) await vaultApi.verifyTotpForAction(secret);
+        else await vaultApi.verifyPasswordForAction(secret);
+      } catch (error) {
+        return toast.error(String(error));
+      }
+    }
+    const accounts = withAccounts
+      ? vault.accounts.filter(account => account.groupId !== group.id)
+      : vault.accounts.map(account =>
+          account.groupId === group.id ? { ...account, groupId: "" } : account
+        );
     await persist({
       ...vault,
       groups: vault.groups.filter(item => item.id !== group.id),
       accounts,
     });
     setActiveGroup("all");
-    toast.success(t.groupDeleted);
+    setGroupDeleteTarget(null);
+    setDeleteVerifySecret("");
+    setDeleteGroupWithAccounts(false);
+    toast.success(
+      withAccounts ? t.home.groupDeletedWithAccounts : t.home.groupDeleted
+    );
   }
 
   async function removeAccount(account: VaultAccount) {
-    if (!vault || !window.confirm(`${t.deleteConfirm} ${account.name}`)) return;
+    if (!vault || !window.confirm(`${t.home.deleteConfirm} ${account.name}`))
+      return;
     await persist({
       ...vault,
       accounts: vault.accounts.filter(item => item.id !== account.id),
     });
-    toast.success(t.deleted);
+    toast.success(t.home.deleted);
   }
 
   async function importQr(file: File) {
@@ -746,13 +695,13 @@ export default function Home() {
         { inversionAttempts: "attemptBoth" }
       );
       URL.revokeObjectURL(objectUrl);
-      if (!result) return toast.error(t.qrFailed);
+      if (!result) return toast.error(t.home.qrFailed);
       const secret = normalizeTotp(result.data);
-      if (!secret) return toast.error(t.qrFailed);
+      if (!secret) return toast.error(t.home.qrFailed);
       setDraft(current => ({ ...current, totpSecret: secret }));
-      toast.success(t.qrImported);
+      toast.success(t.home.qrImported);
     };
-    image.onerror = () => toast.error(t.qrFailed);
+    image.onerror = () => toast.error(t.home.qrFailed);
     image.src = objectUrl;
   }
 
@@ -766,22 +715,33 @@ export default function Home() {
       const haystack = [
         account.name,
         account.email,
+        ...normalizeEmails(account).map(item => item.value),
+        account.note,
         group,
-        dateStamp(account.githubCreatedAt),
+        dateStamp(account.githubCreatedAt, language),
         ageFrom(account.githubCreatedAt),
       ]
         .join(" ")
         .toLowerCase();
       return inGroup && (!query || haystack.includes(query));
     });
-  }, [activeGroup, search, vault]);
+  }, [activeGroup, search, vault, language]);
 
   if (storageState !== "ready") {
     return (
       <main className="screen-fill grid place-items-center bg-[#08080a] px-6 text-white">
-        <p className="text-center text-sm text-zinc-400">
-          {storageState === "error" ? t.storageFailed : t.storageLoading}
-        </p>
+        <div className="flex flex-col items-center gap-4">
+          {storageState === "loading" && (
+            <div className="grid size-12 place-items-center rounded-full border border-violet-300/15 bg-violet-400/[0.06] shadow-[0_0_32px_rgba(168,85,247,0.12)]">
+              <Spinner className="size-6 text-violet-200" />
+            </div>
+          )}
+          <p className="text-center text-sm text-zinc-400">
+            {storageState === "error"
+              ? t.home.storageFailed
+              : t.home.storageLoading}
+          </p>
+        </div>
       </main>
     );
   }
@@ -797,234 +757,473 @@ export default function Home() {
   const secondsLeft = getTotpSecondsLeft(now);
 
   return (
-    <main className="screen-fill bg-[#08080a] text-white selection:bg-violet-500/40">
-      <div className="screen-fill flex">
-        <aside className="hidden w-[250px] shrink-0 flex-col border-r border-white/[0.08] bg-[#0b0b0e] p-5 lg:flex">
-          <div className="flex items-center gap-3 px-1">
-            <VaultMark />
-            <p className="text-sm font-bold tracking-tight">{t.app}</p>
+    <main className="flex h-full min-h-0 flex-col bg-[#08080a] text-white selection:bg-violet-500/40">
+      <div className="flex min-h-0 flex-1">
+        <aside
+          className="no-scrollbar hidden shrink-0 flex-col overflow-x-hidden overflow-y-auto border-r border-white/[0.08] bg-[#0b0b0e] px-3 py-4 transition-[width] duration-300 ease-out lg:flex"
+          style={{
+            width: sidebarCollapsed
+              ? "var(--shell-sidebar-collapsed)"
+              : "var(--shell-sidebar)",
+          }}
+        >
+          <div
+            className={`px-2 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.17em] text-zinc-600 ${sidebarCollapsed ? "hidden" : "block"}`}
+          >
+            {t.home.index}
           </div>
-          <nav className="mt-12 space-y-1">
+          <nav className="space-y-1">
             <button
-              onClick={() => setActiveGroup("all")}
-              className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm transition ${activeGroup === "all" ? "bg-violet-500/12 text-white" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200"}`}
+              onClick={() => selectGroup("all")}
+              title={sidebarCollapsed ? t.home.all : undefined}
+              className={`relative flex h-[38px] items-center rounded-[9px] text-sm transition-colors ${
+                sidebarCollapsed
+                  ? "w-[38px] justify-center self-center"
+                  : "w-full gap-3 px-3"
+              } ${
+                activeGroup === "all"
+                  ? "bg-white/[0.07] font-semibold text-white"
+                  : "font-medium text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200"
+              }`}
             >
-              <span className="flex items-center gap-3">
-                <UsersRound size={16} /> {t.all}
-              </span>
-              <span className="mono text-[10px]">{vault.accounts.length}</span>
-            </button>
-          </nav>
-          <div className="mt-9">
-            <div className="mb-3 flex items-center justify-between px-3">
-              <span className="mono text-[10px] font-medium uppercase tracking-[0.17em] text-zinc-600">
-                {t.groups}
-              </span>
-              <button
-                onClick={() => setGroupDialogOpen(true)}
-                aria-label={t.addGroup}
-                className="text-zinc-500 transition hover:text-violet-300"
+              {activeGroup === "all" && (
+                <span
+                  className={`absolute bottom-[9px] top-[9px] w-[2px] rounded-full bg-violet-400 ${sidebarCollapsed ? "left-1" : "left-0"}`}
+                />
+              )}
+              <span
+                className={`grid h-[22px] w-[22px] shrink-0 place-items-center ${activeGroup === "all" ? "text-zinc-200" : "text-zinc-500"}`}
               >
-                <Plus size={15} />
-              </button>
-            </div>
-            <div className="space-y-1">
-              {vault.groups.map(group => (
-                <div
-                  key={group.id}
-                  className={`flex items-center rounded-xl pr-2 ${activeGroup === group.id ? "bg-white/[0.07] text-white" : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200"}`}
-                >
-                  <button
-                    onClick={() => setActiveGroup(group.id)}
-                    className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left text-sm"
-                  >
-                    <i className="h-2 w-2 shrink-0 rounded-full bg-violet-400" />
-                    <span className="truncate">{group.name}</span>
-                    <span className="mono ml-auto text-[10px]">
-                      {
-                        vault.accounts.filter(
-                          account => account.groupId === group.id
-                        ).length
-                      }
-                    </span>
-                  </button>
-                  <button
-                    onClick={() => removeGroup(group)}
-                    aria-label={`${t.deleteGroup} ${group.name}`}
-                    className="grid h-7 w-7 place-items-center rounded-lg text-zinc-600 hover:bg-red-400/10 hover:text-red-300"
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="mt-auto flex items-center gap-2 border-t border-white/[0.08] pt-5">
-            <button
-              onClick={() => setSettingsOpen(true)}
-              aria-label={t.settings}
-              className="grid h-10 w-10 place-items-center rounded-xl text-zinc-400 hover:bg-white/[0.06] hover:text-white"
-            >
-              <Settings2 size={18} />
-            </button>
-            <button
-              onClick={lockVault}
-              aria-label={t.locked}
-              className="grid h-10 w-10 place-items-center rounded-xl border border-white/[0.08] text-zinc-400 hover:border-violet-300/30 hover:text-violet-200"
-            >
-              <Lock size={17} />
-            </button>
-          </div>
-        </aside>
-        <section className="min-w-0 flex-1">
-          <header className="sticky top-0 z-20 flex h-[76px] items-center gap-3 border-b border-white/[0.08] bg-[#08080a]/88 px-4 backdrop-blur-xl sm:px-7">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-zinc-400 hover:bg-white/[0.06] lg:hidden"
-                  aria-label="菜单"
-                >
-                  <Menu size={20} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                className="max-h-[70vh] w-64 border-white/[0.1] bg-[#141419] p-2 text-zinc-200 lg:hidden"
-              >
-                <DropdownMenuLabel className="text-[10px] uppercase text-zinc-600">
-                  {t.groups}
-                </DropdownMenuLabel>
-                <DropdownMenuItem
-                  onSelect={() => setActiveGroup("all")}
-                  className={activeGroup === "all" ? "bg-violet-500/15" : ""}
-                >
-                  <UsersRound />
-                  <span className="min-w-0 flex-1 truncate">{t.all}</span>
-                  <span className="mono text-[10px] text-zinc-600">
+                <UsersRound size={16} />
+              </span>
+              {!sidebarCollapsed && (
+                <>
+                  <span className="flex-1 truncate text-left">
+                    {t.home.all}
+                  </span>
+                  <span className="mono text-[10px] text-zinc-500">
                     {vault.accounts.length}
                   </span>
-                </DropdownMenuItem>
-                {vault.groups.map(group => (
-                  <DropdownMenuItem
-                    key={group.id}
-                    onSelect={() => setActiveGroup(group.id)}
-                    className={
-                      activeGroup === group.id ? "bg-violet-500/15" : ""
-                    }
-                  >
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: group.color }}
-                    />
-                    <span className="min-w-0 flex-1 truncate">
-                      {group.name}
-                    </span>
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuItem onSelect={() => setGroupDialogOpen(true)}>
-                  <FolderPlus /> {t.addGroup}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-white/[0.08]" />
-                <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
-                  <Settings2 /> {t.settings}
-                </DropdownMenuItem>
-                <DropdownMenuItem variant="destructive" onSelect={lockVault}>
-                  <Lock /> {t.locked}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <h1 className="hidden shrink-0 text-lg font-extrabold tracking-[-0.03em] sm:block">
-              {t.index}
-            </h1>
-            <div className="relative min-w-0 flex-1 max-w-xl">
-              <Search
-                size={17}
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-600"
-              />
-              <Input
-                value={search}
-                onChange={event => setSearch(event.target.value)}
-                placeholder={t.search}
-                className="h-11 rounded-xl border-white/[0.08] bg-white/[0.035] pl-10 text-sm placeholder:text-zinc-600 focus-visible:ring-violet-400/50"
-              />
-              {search && (
-                <button
-                  onClick={() => setSearch("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
-                >
-                  <X size={15} />
-                </button>
+                </>
               )}
-            </div>
-            <Button
-              onClick={openCreateAccount}
-              className="h-11 shrink-0 rounded-xl bg-violet-500 px-4 font-bold hover:bg-violet-400"
-            >
-              <Plus size={17} className="mr-2" />
-              {t.add}
-            </Button>
-            <div className="hidden max-w-sm items-center gap-2 border-l border-white/[0.08] pl-4 2xl:flex">
-              <ShieldCheck size={16} className="shrink-0 text-violet-300" />
-              <p className="text-[11px] leading-4 text-zinc-500">
-                邮箱、密码、双重验证密钥与配置均保存在当前设备的加密容器中。
-              </p>
-            </div>
-          </header>
-          <div className="p-4 sm:p-7">
-            {filteredAccounts.length ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3 3xl:grid-cols-4">
-                {filteredAccounts.map(account => (
-                  <AccountCard
-                    key={account.id}
-                    account={account}
-                    language={lang}
-                    codes={totpCodes[account.id]}
-                    secondsLeft={secondsLeft}
-                    onCopyCode={value => handleCopy(value, t.copiedCode)}
-                    onContext={(event, item) => {
-                      event.preventDefault();
-                      setContext({
-                        x: event.clientX,
-                        y: event.clientY,
-                        account: item,
-                      });
+            </button>
+          </nav>
+          {sidebarCollapsed ? (
+            /* Collapsed rail: the group dots fold into one icon whose flyout
+               (to the right) carries the full group switcher. */
+            <div className="mt-4 flex justify-center">
+              {/* modal={false}: modal menus set `pointer-events: none` on <body>,
+                  which makes Chromium fire synthetic mouseleave/mouseenter on the
+                  icon — the flyout opened, closed and reopened (double pop).
+                  Hover menus should be non-modal anyway. */}
+              <DropdownMenu
+                modal={false}
+                open={groupsFlyoutOpen}
+                onOpenChange={setGroupsFlyoutOpen}
+              >
+                <DropdownMenuTrigger asChild>
+                  <button
+                    onMouseEnter={() => {
+                      cancelGroupsFlyoutClose();
+                      setGroupsFlyoutOpen(true);
                     }}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="relative isolate flex min-h-[480px] overflow-hidden rounded-3xl border border-dashed border-white/[0.11] bg-white/[0.02] p-7">
-                <div
-                  className="absolute inset-0 bg-cover bg-center opacity-20"
-                  style={{ backgroundImage: `url(${EMPTY_STATE})` }}
-                />
-                <div className="relative my-auto max-w-md">
-                  <h2 className="text-2xl font-extrabold tracking-[-0.04em]">
-                    {search ? t.noResults : t.noAccounts}
-                  </h2>
-                  <p className="mt-3 max-w-sm text-sm leading-6 text-zinc-500">
-                    {search ? t.noResultsHint : t.noAccountsHint}
-                  </p>
-                  {!search && (
-                    <Button
-                      onClick={openCreateAccount}
-                      className="mt-6 bg-violet-500 font-bold hover:bg-violet-400"
+                    onMouseLeave={scheduleGroupsFlyoutClose}
+                    title={t.home.groups}
+                    aria-label={t.home.groups}
+                    className={`relative grid h-[38px] w-[38px] place-items-center rounded-[9px] transition-colors ${
+                      activeGroup !== "all"
+                        ? "bg-white/[0.07] text-white"
+                        : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200"
+                    }`}
+                  >
+                    {activeGroup !== "all" && (
+                      <span className="absolute bottom-[9px] left-1 top-[9px] w-[2px] rounded-full bg-violet-400" />
+                    )}
+                    <Folder size={16} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  side="right"
+                  align="start"
+                  onMouseEnter={cancelGroupsFlyoutClose}
+                  onMouseLeave={scheduleGroupsFlyoutClose}
+                  className="max-h-[70vh] w-56 border-white/[0.1] bg-[#141419] p-2 text-zinc-200"
+                >
+                  {vault.groups.map(group => (
+                    <DropdownMenuItem
+                      key={group.id}
+                      onSelect={() => selectGroup(group.id)}
+                      onContextMenu={event => {
+                        event.preventDefault();
+                        setGroupContext({
+                          x: event.clientX,
+                          y: event.clientY,
+                          group,
+                        });
+                      }}
+                      className={
+                        activeGroup === group.id ? "bg-violet-500/15" : ""
+                      }
                     >
-                      <CirclePlus className="mr-2" size={17} />
-                      {t.addFirst}
-                    </Button>
+                      <span
+                        className="size-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: group.color }}
+                      />
+                      <span className="min-w-0 flex-1 truncate">
+                        {group.name}
+                      </span>
+                      <span className="mono text-[10px] text-zinc-600">
+                        {
+                          vault.accounts.filter(
+                            account => account.groupId === group.id
+                          ).length
+                        }
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                  {vault.groups.length > 0 && (
+                    <DropdownMenuSeparator className="bg-white/[0.08]" />
                   )}
-                </div>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setEditingGroup(null);
+                      setGroupName("");
+                      setGroupDialogOpen(true);
+                    }}
+                  >
+                    <FolderPlus /> {t.home.addGroup}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          ) : (
+            <div className="mt-6">
+              <div className="mb-2 flex items-center justify-between px-2">
+                <span className="mono text-[10px] font-medium uppercase tracking-[0.17em] text-zinc-600">
+                  {t.home.groups}
+                </span>
+                <button
+                  onClick={() => {
+                    setEditingGroup(null);
+                    setGroupName("");
+                    setGroupDialogOpen(true);
+                  }}
+                  aria-label={t.home.addGroup}
+                  className="text-zinc-500 transition hover:text-violet-300"
+                >
+                  <Plus size={15} />
+                </button>
               </div>
-            )}
+              <div className="space-y-1">
+                {vault.groups.map(group => {
+                  const active = activeGroup === group.id;
+                  const count = vault.accounts.filter(
+                    account => account.groupId === group.id
+                  ).length;
+                  return (
+                    <div
+                      key={group.id}
+                      onContextMenu={event => {
+                        event.preventDefault();
+                        setGroupContext({
+                          x: event.clientX,
+                          y: event.clientY,
+                          group,
+                        });
+                      }}
+                      className={`relative flex h-[38px] items-center rounded-[9px] transition-colors ${
+                        sidebarCollapsed
+                          ? "w-[38px] justify-center self-center"
+                          : "w-full pr-2"
+                      } ${
+                        active
+                          ? "bg-white/[0.07] text-white"
+                          : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200"
+                      }`}
+                    >
+                      {active && (
+                        <span
+                          className={`absolute bottom-[9px] top-[9px] w-[2px] rounded-full bg-violet-400 ${sidebarCollapsed ? "left-1" : "left-0"}`}
+                        />
+                      )}
+                      <button
+                        onClick={() => selectGroup(group.id)}
+                        title={sidebarCollapsed ? group.name : undefined}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left text-sm font-medium"
+                      >
+                        <span className="grid h-[22px] w-[22px] shrink-0 place-items-center">
+                          <i
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: group.color }}
+                          />
+                        </span>
+                        {!sidebarCollapsed && (
+                          <>
+                            <span className="flex-1 truncate">
+                              {group.name}
+                            </span>
+                            <span className="mono text-[10px] text-zinc-500">
+                              {count}
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <div className="mt-auto shrink-0">
+            <div
+              className={`pt-3 ${
+                sidebarCollapsed
+                  ? "flex flex-col items-center gap-1"
+                  : "space-y-1"
+              }`}
+            >
+              <button
+                onClick={() => setSettingsOpen(true)}
+                aria-label={t.home.settings}
+                title={t.home.settings}
+                className={`flex h-[38px] items-center rounded-[9px] text-sm font-medium text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-200 ${
+                  sidebarCollapsed
+                    ? "w-[38px] justify-center"
+                    : "w-full gap-3 px-3"
+                }`}
+              >
+                <Settings2 size={16} />
+                {!sidebarCollapsed && <span>{t.home.settings}</span>}
+              </button>
+              <button
+                onClick={lockVault}
+                aria-label={t.home.locked}
+                title={t.home.locked}
+                className={`flex h-[38px] items-center rounded-[9px] text-sm font-medium text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-violet-200 ${
+                  sidebarCollapsed
+                    ? "w-[38px] justify-center"
+                    : "w-full gap-3 px-3"
+                }`}
+              >
+                <Lock size={16} />
+                {!sidebarCollapsed && <span>{t.home.locked}</span>}
+              </button>
+              <button
+                onClick={() => sidebarShell.setCollapsed(!sidebarCollapsed)}
+                aria-label={
+                  sidebarCollapsed
+                    ? t.home.expandSidebar
+                    : t.home.collapseSidebar
+                }
+                title={
+                  sidebarCollapsed
+                    ? t.home.expandSidebar
+                    : t.home.collapseSidebar
+                }
+                className={`flex h-[38px] items-center rounded-[9px] text-sm font-medium text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-200 ${
+                  sidebarCollapsed
+                    ? "w-[38px] justify-center"
+                    : "w-full gap-3 px-3"
+                }`}
+              >
+                {sidebarCollapsed ? (
+                  <PanelLeft size={16} />
+                ) : (
+                  <PanelLeftClose size={16} />
+                )}
+                {!sidebarCollapsed && <span>{t.home.collapseSidebar}</span>}
+              </button>
+            </div>
+            <div className="mt-3 border-t border-white/[0.08]" />
           </div>
+        </aside>
+        <section className="flex min-w-0 flex-1 flex-col">
+          {isSettingsOpen ? (
+            <VaultSettingsPage
+              onBack={() => setSettingsOpen(false)}
+              settings={vault.settings}
+              quickUnlockEnabled={quickUnlockEnabled}
+              onSavePreferences={async settings => {
+                await persist({ ...vault, settings });
+              }}
+              onQuickUnlockChange={enabled => {
+                setQuickUnlockEnabled(enabled);
+                setVaultStatus(status =>
+                  status ? { ...status, quickUnlockEnabled: enabled } : status
+                );
+              }}
+              onImported={payload => setVault(payload)}
+            />
+          ) : (
+            <>
+              {/* No bottom border here: the toolbar hairline above this row is the
+              separator, and its left end meets the sidebar's right edge. */}
+              <header className="flex h-[54px] shrink-0 items-center gap-3 px-4 sm:px-7">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-zinc-400 hover:bg-white/[0.06] lg:hidden"
+                      aria-label={t.home.menu}
+                    >
+                      <Menu size={20} />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    className="max-h-[70vh] w-64 border-white/[0.1] bg-[#141419] p-2 text-zinc-200 lg:hidden"
+                  >
+                    <DropdownMenuLabel className="text-[10px] uppercase text-zinc-600">
+                      {t.home.groups}
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem
+                      onSelect={() => selectGroup("all")}
+                      className={
+                        activeGroup === "all" ? "bg-violet-500/15" : ""
+                      }
+                    >
+                      <UsersRound />
+                      <span className="min-w-0 flex-1 truncate">
+                        {t.home.all}
+                      </span>
+                      <span className="mono text-[10px] text-zinc-600">
+                        {vault.accounts.length}
+                      </span>
+                    </DropdownMenuItem>
+                    {vault.groups.map(group => (
+                      <DropdownMenuItem
+                        key={group.id}
+                        onSelect={() => selectGroup(group.id)}
+                        onContextMenu={event => {
+                          event.preventDefault();
+                          setGroupContext({
+                            x: event.clientX,
+                            y: event.clientY,
+                            group,
+                          });
+                        }}
+                        className={
+                          activeGroup === group.id ? "bg-violet-500/15" : ""
+                        }
+                      >
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: group.color }}
+                        />
+                        <span className="min-w-0 flex-1 truncate">
+                          {group.name}
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        setEditingGroup(null);
+                        setGroupName("");
+                        setGroupDialogOpen(true);
+                      }}
+                    >
+                      <FolderPlus /> {t.home.addGroup}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-white/[0.08]" />
+                    <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
+                      <Settings2 /> {t.home.settings}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={lockVault}
+                    >
+                      <Lock /> {t.home.locked}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <h1 className="shrink-0 text-lg font-extrabold tracking-[-0.03em]">
+                  {t.home.index}
+                </h1>
+                <div className="ml-auto hidden max-w-sm items-center gap-2 border-l border-white/[0.08] pl-4 2xl:flex">
+                  <ShieldCheck size={16} className="shrink-0 text-violet-300" />
+                  <p className="text-[11px] leading-4 text-zinc-500">
+                    {t.home.headerPrivacy}
+                  </p>
+                </div>
+              </header>
+              <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto p-4 sm:p-7">
+                {filteredAccounts.length ? (
+                  /* Auto-fill keeps every card the same width and reflows by
+                 available width: 4 across on a fullscreen 1080p window, fewer
+                 as the window shrinks — no fixed breakpoints. */
+                  <div className="grid gap-4 [grid-auto-rows:1fr] [grid-template-columns:repeat(auto-fill,minmax(340px,1fr))]">
+                    {filteredAccounts.map(account => (
+                      <AccountCard
+                        key={account.id}
+                        account={account}
+                        t={t.home}
+                        codes={totpCodes[account.id]}
+                        secondsLeft={secondsLeft}
+                        onCopyCode={value =>
+                          handleCopy(value, t.home.copiedCode)
+                        }
+                        onContext={(event, item) => {
+                          event.preventDefault();
+                          setContext({
+                            x: event.clientX,
+                            y: event.clientY,
+                            account: item,
+                          });
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="relative isolate flex min-h-[480px] overflow-hidden rounded-3xl border border-dashed border-white/[0.11] bg-white/[0.02] p-7">
+                    <div
+                      className="absolute inset-0 bg-cover bg-center opacity-20"
+                      style={{ backgroundImage: `url(${EMPTY_STATE})` }}
+                    />
+                    <div className="relative my-auto max-w-md">
+                      <h2 className="text-2xl font-extrabold tracking-[-0.04em]">
+                        {search ? t.home.noResults : t.home.noAccounts}
+                      </h2>
+                      <p className="mt-3 max-w-sm text-sm leading-6 text-zinc-500">
+                        {search ? t.home.noResultsHint : t.home.noAccountsHint}
+                      </p>
+                      {!search && (
+                        <Button
+                          onClick={openCreateAccount}
+                          className="mt-6 bg-violet-500 font-bold hover:bg-violet-400"
+                        >
+                          <CirclePlus className="mr-2" size={17} />
+                          {t.home.addFirst}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </section>
       </div>
+
+      <footer
+        role="status"
+        className="flex h-8 shrink-0 items-center gap-3 border-t border-white/[0.08] px-4 text-[11px] text-zinc-500"
+      >
+        <span className="inline-flex items-center gap-1.5">
+          <ShieldCheck size={12} className="text-violet-300" />
+          {t.home.footerEncryption}
+        </span>
+        <span className="h-3.5 w-px bg-white/[0.08]" />
+        <span>
+          {vault.accounts.length} {t.home.accounts}
+        </span>
+        <span className="ml-auto inline-flex items-center gap-1.5">
+          {t.home.footerNoSync}
+        </span>
+      </footer>
 
       {context && (
         <div
           onClick={event => event.stopPropagation()}
-          className="fixed z-50 w-60 overflow-hidden rounded-2xl border border-white/[0.12] bg-[#1a1a20]/95 p-1.5 shadow-2xl backdrop-blur-xl"
+          className="fixed z-[70] w-60 overflow-hidden rounded-2xl border border-white/[0.12] bg-[#1a1a20]/95 p-1.5 shadow-2xl backdrop-blur-xl"
           style={{
             left: Math.min(context.x, window.innerWidth - 260),
             top: Math.min(context.y, window.innerHeight - 310),
@@ -1035,33 +1234,57 @@ export default function Home() {
           </div>
           <MenuItem
             icon={<UserRound size={15} />}
-            label={t.copyName}
-            onClick={() => handleCopy(context.account.name, t.copied)}
+            label={t.home.copyName}
+            onClick={() => handleCopy(context.account.name, t.home.copied)}
           />
           <MenuItem
             icon={<Clipboard size={15} />}
-            label={t.copyEmail}
-            onClick={() => handleCopy(context.account.email, t.copied)}
+            label={t.home.copyEmail}
+            onClick={() =>
+              handleCopy(
+                normalizeEmails(context.account)[0]?.value ??
+                  context.account.email,
+                t.home.copied
+              )
+            }
           />
+          {normalizeEmails(context.account)
+            .slice(1)
+            .map(email => (
+              <MenuItem
+                key={email.value}
+                icon={<Clipboard size={15} />}
+                label={`${t.home.copyEmail}: ${email.value}`}
+                onClick={() => handleCopy(email.value, t.home.copied)}
+              />
+            ))}
           <MenuItem
             icon={<KeyRound size={15} />}
-            label={t.copyPassword}
+            label={t.home.copyPassword}
             onClick={() =>
-              handleCopy(context.account.password, t.copiedPassword)
+              handleCopy(context.account.password, t.home.copiedPassword)
             }
           />
           <MenuItem
             icon={<TimerReset size={15} />}
-            label={`${t.copyTotp} · ${secondsLeft}s`}
+            label={`${t.home.copyTotp} · ${secondsLeft}s`}
             onClick={async () => {
               const code = await generateTotp(context.account.totpSecret, now);
-              handleCopy(code ?? "", t.copiedCode);
+              handleCopy(code ?? "", t.home.copiedCode);
+            }}
+          />
+          <MenuItem
+            icon={<UserRound size={15} />}
+            label={t.home.preview}
+            onClick={() => {
+              setPreviewAccount(context.account);
+              setContext(null);
             }}
           />
           <div className="my-1 border-t border-white/[0.08]" />
           <MenuItem
             icon={<Edit3 size={15} />}
-            label={t.edit}
+            label={t.home.edit}
             onClick={() => {
               openEditAccount(context.account);
               setContext(null);
@@ -1070,10 +1293,41 @@ export default function Home() {
           <MenuItem
             danger
             icon={<Trash2 size={15} />}
-            label={t.delete}
+            label={t.home.delete}
             onClick={() => {
               removeAccount(context.account);
               setContext(null);
+            }}
+          />
+        </div>
+      )}
+
+      {groupContext && (
+        <div
+          onClick={event => event.stopPropagation()}
+          className="fixed z-[70] w-52 overflow-hidden rounded-2xl border border-white/[0.12] bg-[#1a1a20]/95 p-1.5 shadow-2xl backdrop-blur-xl"
+          style={{
+            left: Math.min(groupContext.x, window.innerWidth - 230),
+            top: Math.min(groupContext.y, window.innerHeight - 180),
+          }}
+        >
+          <div className="mono border-b border-white/[0.08] px-3 py-2.5 text-[10px] uppercase tracking-[0.13em] text-zinc-600">
+            {groupContext.group.name}
+          </div>
+          <MenuItem
+            icon={<Edit3 size={15} />}
+            label={t.home.editGroup}
+            onClick={() => openEditGroup(groupContext.group)}
+          />
+          <MenuItem
+            icon={<Trash2 size={15} />}
+            danger
+            label={t.home.deleteGroup}
+            onClick={() => {
+              setDeleteGroupWithAccounts(false);
+              setDeleteVerifySecret("");
+              setGroupDeleteTarget(groupContext.group);
+              setGroupContext(null);
             }}
           />
         </div>
@@ -1089,17 +1343,17 @@ export default function Home() {
             <div className="relative">
               <DialogHeader>
                 <DialogTitle className="text-xl font-extrabold tracking-[-0.03em]">
-                  {editing ? t.editTitle : t.accountTitle}
+                  {editing ? t.home.editTitle : t.home.accountTitle}
                 </DialogTitle>
                 <DialogDescription className="mt-2 max-w-lg text-sm leading-6 text-zinc-400">
-                  {t.accountHint}
+                  {t.home.accountHint}
                 </DialogDescription>
               </DialogHeader>
             </div>
           </div>
           <div className="space-y-5 p-6">
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label={t.username}>
+              <Field label={t.home.username}>
                 <Input
                   value={draft.name}
                   onChange={event =>
@@ -1109,7 +1363,7 @@ export default function Home() {
                   autoFocus
                 />
               </Field>
-              <Field label={t.group}>
+              <Field label={t.home.group}>
                 <Select
                   value={draft.groupId || "__none__"}
                   onValueChange={groupId =>
@@ -1123,7 +1377,7 @@ export default function Home() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">{t.noGroup}</SelectItem>
+                    <SelectItem value="__none__">{t.home.noGroup}</SelectItem>
                     {vault.groups.map(group => (
                       <SelectItem key={group.id} value={group.id}>
                         {group.name}
@@ -1133,17 +1387,110 @@ export default function Home() {
                 </Select>
               </Field>
             </div>
-            <Field label={t.email}>
-              <Input
-                value={draft.email}
-                onChange={event =>
-                  setDraft({ ...draft, email: event.target.value })
-                }
-                type="email"
-                placeholder="name@example.com"
-              />
+            <Field label={t.home.emails}>
+              <div className="space-y-2">
+                {(draft.emails ?? []).map((email, index) => (
+                  <div
+                    key={`${index}-${email.value}`}
+                    className="flex flex-wrap items-center gap-2"
+                  >
+                    <Input
+                      value={email.value}
+                      onChange={event =>
+                        setDraft({
+                          ...draft,
+                          emails: draft.emails.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? { ...item, value: event.target.value }
+                              : item
+                          ),
+                          email: index === 0 ? event.target.value : draft.email,
+                        })
+                      }
+                      type="email"
+                      placeholder="name@example.com"
+                      className="min-w-[180px] flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className={`h-9 px-2 text-xs ${email.isPrimary ? "border-violet-400/50 text-violet-200" : "text-zinc-400"}`}
+                      onClick={() =>
+                        setDraft({
+                          ...draft,
+                          email: email.value,
+                          emails: draft.emails.map((item, itemIndex) => ({
+                            ...item,
+                            isPrimary: itemIndex === index,
+                            showOnHome:
+                              itemIndex === index ? true : item.showOnHome,
+                          })),
+                        })
+                      }
+                    >
+                      {email.isPrimary ? t.home.primary : t.home.primary}
+                    </Button>
+                    <label className="flex items-center gap-1 text-[11px] text-zinc-500">
+                      <input
+                        type="checkbox"
+                        checked={email.showOnHome}
+                        onChange={event =>
+                          setDraft({
+                            ...draft,
+                            emails: draft.emails.map((item, itemIndex) =>
+                              itemIndex === index
+                                ? { ...item, showOnHome: event.target.checked }
+                                : item
+                            ),
+                          })
+                        }
+                      />
+                      {t.home.showOnHome}
+                    </label>
+                    {draft.emails.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-9 px-2 text-red-300"
+                        onClick={() =>
+                          setDraft({
+                            ...draft,
+                            emails: draft.emails.filter(
+                              (_, itemIndex) => itemIndex !== index
+                            ),
+                          })
+                        }
+                      >
+                        <X size={14} />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <div className="flex items-center justify-between gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    onClick={() =>
+                      setDraft({
+                        ...draft,
+                        emails: [
+                          ...draft.emails,
+                          { value: "", isPrimary: false, showOnHome: false },
+                        ],
+                      })
+                    }
+                  >
+                    <Plus size={14} className="mr-1" />
+                    {t.home.addEmail}
+                  </Button>
+                  <span className="text-[11px] text-zinc-600">
+                    {t.home.maxHomeEmails}
+                  </span>
+                </div>
+              </div>
             </Field>
-            <Field label={t.password}>
+            <Field label={t.home.password}>
               <Input
                 value={draft.password}
                 onChange={event =>
@@ -1153,12 +1500,22 @@ export default function Home() {
                 placeholder="••••••••••••"
               />
             </Field>
+            <Field label={t.home.note}>
+              <Textarea
+                value={draft.note}
+                onChange={event =>
+                  setDraft({ ...draft, note: event.target.value })
+                }
+                placeholder={t.home.note}
+                className="min-h-[72px] border-white/[0.08] bg-white/[0.04]"
+              />
+            </Field>
             <div className="rounded-xl border border-white/[0.08] bg-black/20 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <Label>{t.twoFactor}</Label>
+                  <Label>{t.home.twoFactor}</Label>
                   <p className="mt-1 text-[11px] leading-5 text-zinc-500">
-                    {t.importQrHint}
+                    {t.home.importQrHint}
                   </p>
                 </div>
                 <Button
@@ -1168,7 +1525,7 @@ export default function Home() {
                   className="h-9 border-white/[0.1] bg-white/[0.04] text-xs text-zinc-200 hover:bg-white/[0.08]"
                 >
                   <Upload size={14} className="mr-2" />
-                  {t.importQr}
+                  {t.home.importQr}
                 </Button>
                 <input
                   ref={fileInput}
@@ -1195,14 +1552,14 @@ export default function Home() {
                 onClick={() => setAccountDialogOpen(false)}
                 className="text-zinc-400 hover:bg-white/[0.06] hover:text-white"
               >
-                {t.cancel}
+                {t.home.cancel}
               </Button>
               <Button
                 onClick={saveAccount}
                 className="bg-violet-500 font-bold hover:bg-violet-400"
               >
                 <Lock size={15} className="mr-2" />
-                {t.save}
+                {t.home.save}
               </Button>
             </div>
           </div>
@@ -1212,16 +1569,18 @@ export default function Home() {
       <Dialog open={isGroupDialogOpen} onOpenChange={setGroupDialogOpen}>
         <DialogContent className="max-w-md border-white/[0.1] bg-[#141419] text-white">
           <DialogHeader>
-            <DialogTitle>{t.createGroup}</DialogTitle>
-            <DialogDescription>{t.groupHint}</DialogDescription>
+            <DialogTitle>
+              {editingGroup ? t.home.editGroup : t.home.createGroup}
+            </DialogTitle>
+            <DialogDescription>{t.home.groupHint}</DialogDescription>
           </DialogHeader>
-          <Field label={t.groupName}>
+          <Field label={t.home.groupName}>
             <Input
               autoFocus
               value={groupName}
               onChange={event => setGroupName(event.target.value)}
               onKeyDown={event => event.key === "Enter" && createGroup()}
-              placeholder="团队账户"
+              placeholder={t.home.groupPlaceholder}
             />
           </Field>
           <div className="flex justify-end gap-3">
@@ -1230,37 +1589,238 @@ export default function Home() {
               onClick={() => setGroupDialogOpen(false)}
               className="text-zinc-400"
             >
-              {t.cancel}
+              {t.home.cancel}
             </Button>
             <Button
               onClick={createGroup}
               className="bg-violet-500 hover:bg-violet-400"
             >
               <FolderPlus size={15} className="mr-2" />
-              {t.createGroup}
+              {editingGroup ? t.home.editGroup : t.home.createGroup}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      <VaultSettingsDialog
-        open={isSettingsOpen}
-        onOpenChange={setSettingsOpen}
-        language={lang}
-        settings={vault.settings}
-        quickUnlockEnabled={quickUnlockEnabled}
-        onSavePreferences={async settings => {
-          await persist({ ...vault, settings });
-        }}
-        onQuickUnlockChange={enabled => {
-          setQuickUnlockEnabled(enabled);
-          setVaultStatus(status =>
-            status ? { ...status, quickUnlockEnabled: enabled } : status
-          );
-        }}
-        onImported={payload => setVault(payload)}
-      />
+      <Dialog
+        open={Boolean(groupDeleteTarget)}
+        onOpenChange={open => !open && setGroupDeleteTarget(null)}
+      >
+        <DialogContent className="max-w-md border-white/[0.1] bg-[#141419] text-white">
+          <DialogHeader>
+            <DialogTitle>
+              {t.home.deleteGroup}: {groupDeleteTarget?.name}
+            </DialogTitle>
+            <DialogDescription>
+              {t.home.groupAccountCount}{" "}
+              {groupDeleteTarget
+                ? vault.accounts.filter(
+                    account => account.groupId === groupDeleteTarget.id
+                  ).length
+                : 0}{" "}
+              {t.home.accounts}。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => setDeleteGroupWithAccounts(false)}
+              className={`w-full rounded-xl border p-3 text-left ${!deleteGroupWithAccounts ? "border-violet-400/60 bg-violet-500/10" : "border-white/[0.08]"}`}
+            >
+              <strong className="block text-sm">
+                {t.home.deleteGroupOnly}
+              </strong>
+              <span className="mt-1 block text-xs text-zinc-500">
+                {t.home.deleteGroupOnlyHint}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeleteGroupWithAccounts(true)}
+              className={`w-full rounded-xl border p-3 text-left ${deleteGroupWithAccounts ? "border-red-400/60 bg-red-500/10" : "border-white/[0.08]"}`}
+            >
+              <strong className="block text-sm text-red-200">
+                {t.home.deleteGroupWithAccounts}
+              </strong>
+              <span className="mt-1 block text-xs text-zinc-500">
+                {quickUnlockEnabled
+                  ? t.home.deleteGroupWithAccountsHint
+                  : t.home.deleteGroupWithAccountsPasswordHint}
+              </span>
+            </button>
+            {deleteGroupWithAccounts &&
+              (quickUnlockEnabled ? (
+                <Input
+                  value={deleteVerifySecret}
+                  onChange={event => setDeleteVerifySecret(event.target.value)}
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="000000"
+                  className="mono text-center tracking-[0.3em]"
+                />
+              ) : (
+                <Input
+                  value={deleteVerifySecret}
+                  onChange={event => setDeleteVerifySecret(event.target.value)}
+                  type="password"
+                  placeholder={t.home.oldPassword}
+                  className="text-center"
+                />
+              ))}
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => setGroupDeleteTarget(null)}
+              className="text-zinc-400"
+            >
+              {t.home.cancel}
+            </Button>
+            <Button
+              onClick={() =>
+                groupDeleteTarget &&
+                removeGroup(groupDeleteTarget, deleteGroupWithAccounts)
+              }
+              className={
+                deleteGroupWithAccounts
+                  ? "bg-red-500 hover:bg-red-400"
+                  : "bg-violet-500 hover:bg-violet-400"
+              }
+            >
+              {t.home.confirmDeleteGroup}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(previewAccount)}
+        onOpenChange={open => !open && setPreviewAccount(null)}
+      >
+        <DialogContent className="max-h-[85vh] max-w-md overflow-y-auto border-white/[0.1] bg-[#141419] text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              {previewAccount &&
+                (previewAccount.avatarUrl ? (
+                  <img
+                    src={previewAccount.avatarUrl}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                    className="size-10 shrink-0 rounded-xl border border-white/10 object-cover"
+                  />
+                ) : (
+                  <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.06] text-sm font-extrabold text-violet-200">
+                    {previewAccount.name.slice(0, 1).toUpperCase()}
+                  </span>
+                ))}
+              <span className="min-w-0">
+                <span className="block break-all text-base leading-6">
+                  {previewAccount?.name}
+                </span>
+                <span className="mono mt-0.5 block text-[11px] font-normal text-zinc-500">
+                  {t.home.accountAge}{" "}
+                  {previewAccount
+                    ? ageFrom(previewAccount.githubCreatedAt)
+                    : "—"}
+                  {previewAccount?.githubCreatedAt &&
+                    ` · ${t.home.created} ${dateStamp(previewAccount.githubCreatedAt, language)}`}
+                </span>
+              </span>
+            </DialogTitle>
+            <DialogDescription className="flex items-center gap-1.5">
+              <ShieldCheck size={13} className="text-violet-300" />{" "}
+              {t.home.secure}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            {previewAccount && (
+              <>
+                {/* Every row copies on click; values wrap fully instead of truncating. */}
+                <PreviewRow
+                  label={t.home.username}
+                  value={previewAccount.name}
+                  onCopy={handleCopy}
+                  copyLabel={t.home.copied}
+                />
+                {normalizeEmails(previewAccount).map(item => (
+                  <PreviewRow
+                    key={item.value}
+                    label={t.home.email}
+                    value={item.value}
+                    onCopy={handleCopy}
+                    copyLabel={t.home.copied}
+                  />
+                ))}
+                <PreviewRow
+                  label={t.home.password}
+                  value={previewAccount.password}
+                  onCopy={handleCopy}
+                  copyLabel={t.home.copiedPassword}
+                />
+                {previewAccount.totpSecret && (
+                  <div className="rounded-xl border border-violet-400/25 bg-violet-500/[0.08] px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[11px] font-semibold text-zinc-400">
+                        {t.home.currentCode}
+                      </span>
+                      <span className="mono text-[10px] text-violet-200/70">
+                        {secondsLeft}s
+                      </span>
+                    </div>
+                    <p className="mono mt-1 text-xl font-bold tracking-[0.08em] text-violet-100">
+                      {formatCode(
+                        totpCodes[previewAccount.id]?.current ?? null
+                      )}
+                    </p>
+                  </div>
+                )}
+                {previewAccount.note && (
+                  <PreviewRow
+                    label={t.home.note}
+                    value={previewAccount.note}
+                    onCopy={handleCopy}
+                    copyLabel={t.home.copied}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </main>
+  );
+}
+
+function PreviewRow({
+  label,
+  value,
+  onCopy,
+  copyLabel,
+}: {
+  label: string;
+  value: string;
+  onCopy: (value: string, label: string) => unknown;
+  copyLabel: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => void onCopy(value, copyLabel)}
+      className="group flex w-full items-start justify-between gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-left transition hover:border-violet-400/40 hover:bg-white/[0.06]"
+    >
+      <span className="min-w-0">
+        <span className="block text-[11px] font-semibold text-zinc-500">
+          {label}
+        </span>
+        <span className="mt-1 block break-all text-sm leading-5 text-zinc-100">
+          {value}
+        </span>
+      </span>
+      <Copy
+        size={14}
+        className="mt-0.5 shrink-0 text-violet-300/60 transition group-hover:text-violet-300"
+      />
+    </button>
   );
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "github-account-vault",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "type": "module",
   "license": "MIT",
   "scripts": {
@@ -11,7 +11,7 @@
     "preview": "vite preview --host",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
+    "tauri:build": "node scripts/stamp-version.mjs && tauri build --config build/version.json",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test:security": "cargo test --manifest-path src-tauri/Cargo.toml"
