@@ -301,7 +301,13 @@ pub fn apply_import(
     import_date: &str,
 ) -> Result<VaultPayload, String> {
     match mode {
-        ImportMode::Replace => Ok(imported.clone()),
+        // API keys are bound to this installation and must never become active
+        // merely because a backup from another machine was restored.
+        ImportMode::Replace => {
+            let mut replacement = imported.clone();
+            replacement.local_api = current.local_api.clone();
+            Ok(replacement)
+        }
         ImportMode::Add => add_payload(current, imported),
         ImportMode::BackupGroup => backup_group_payload(current, imported, import_date),
     }
@@ -414,6 +420,7 @@ mod tests {
                 updated_at: "2026-08-15T00:00:00Z".to_string(),
             }],
             settings: VaultSettings::default(),
+            local_api: crate::local_api::LocalApiConfig::default(),
         }
     }
 

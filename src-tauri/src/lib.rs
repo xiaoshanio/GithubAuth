@@ -1,4 +1,5 @@
 mod backup;
+mod local_api;
 mod quick_unlock;
 mod storage;
 mod vault;
@@ -100,6 +101,32 @@ fn state_lock<'a>(
         .0
         .lock()
         .map_err(|_| "Security state is unavailable".to_string())
+}
+
+fn persist_session_payload(app: &AppHandle, session: &mut UnlockedSession) -> Result<(), String> {
+    let envelope = encrypt_payload(&session.envelope, &session.data_key, &session.payload)?;
+    write_envelope(app, &envelope)?;
+    session.envelope = envelope;
+    Ok(())
+}
+
+fn verify_action_secret(
+    app: &AppHandle,
+    session: &UnlockedSession,
+    auth_kind: &str,
+    credential: &str,
+) -> Result<(), String> {
+    match auth_kind {
+        "totp" => {
+            let _ = quick_unlock::verify(app, &session.envelope.vault_id, credential)?;
+            Ok(())
+        }
+        "password" => {
+            let password = Zeroizing::new(credential.to_string());
+            verify_password(&session.envelope, &session.data_key, &password)
+        }
+        _ => Err("Choose password or 2FA verification".to_string()),
+    }
 }
 
 fn read_vault(app: &AppHandle) -> Result<Option<String>, String> {
@@ -336,6 +363,15 @@ fn lock_vault(state: State<'_, AppSecurityState>) -> Result<(), String> {
     security.pending_import = None;
     security.pending_rebind = None;
     Ok(())
+}
+
+#[tauri::command]
+fn get_unlocked_payload(state: State<'_, AppSecurityState>) -> Result<VaultPayload, String> {
+    state_lock(&state)?
+        .unlocked
+        .as_ref()
+        .map(|session| session.payload.clone())
+        .ok_or_else(|| "Unlock the vault before reading its current state".to_string())
 }
 
 #[tauri::command]
@@ -669,6 +705,7 @@ fn start_backup_scheduler(app: AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .manage(AppSecurityState::default())
+        .manage(local_api::LocalApiRuntime::default())
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
@@ -677,6 +714,7 @@ pub fn run() {
         }))
         .setup(|app| {
             start_backup_scheduler(app.handle().clone());
+            local_api::start_server(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -706,6 +744,18 @@ pub fn run() {
             inspect_backup,
             cancel_backup_import,
             commit_backup_import,
+            get_unlocked_payload,
+            local_api::get_local_api_runtime_status,
+            local_api::get_pending_api_imports,
+            local_api::get_pending_api_exports,
+            local_api::approve_local_api_import,
+            local_api::deny_local_api_import,
+            local_api::approve_local_api_export,
+            local_api::deny_local_api_export,
+            local_api::create_local_api_key,
+            local_api::set_local_api_export_enabled,
+            local_api::set_local_api_key_enabled,
+            local_api::delete_local_api_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Github Auth");

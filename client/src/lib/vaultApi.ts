@@ -1,6 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   BackupSettings,
+  LocalApiConfig,
+  LocalApiRuntimeStatus,
+  PendingApiImport,
+  PendingApiExport,
   ImportMode,
   ImportPreview,
   TotpSetupView,
@@ -9,6 +13,11 @@ import type {
   VaultStatus,
 } from "./types";
 
+export type CreatedApiKey = {
+  apiKey: string;
+  config: LocalApiConfig;
+};
+
 export type ResetOutcome = {
   backupPath: string;
   verifiedBy: "windowsHello" | "acknowledgment";
@@ -16,7 +25,10 @@ export type ResetOutcome = {
 
 export const vaultApi = {
   getStatus: () => invoke<VaultStatus>("get_vault_status"),
-  checkWindowsHello: () => invoke<"available" | "notConfigured" | "unavailable">("check_windows_hello"),
+  checkWindowsHello: () =>
+    invoke<"available" | "notConfigured" | "unavailable">(
+      "check_windows_hello"
+    ),
   resetVault: (acknowledgment?: string | null) =>
     invoke<ResetOutcome>("reset_vault", {
       acknowledgment: acknowledgment ?? null,
@@ -40,6 +52,7 @@ export const vaultApi = {
   lock: () => invoke<void>("lock_vault"),
   savePayload: (payload: VaultPayload) =>
     invoke<void>("save_vault_payload", { payload }),
+  getUnlockedPayload: () => invoke<VaultPayload>("get_unlocked_payload"),
   changeMasterPassword: (currentPassword: string, newPassword: string) =>
     invoke<void>("change_master_password", { currentPassword, newPassword }),
   beginTotpRebind: (currentPassword: string) =>
@@ -69,4 +82,66 @@ export const vaultApi = {
       backupCurrent,
       currentPassword: currentPassword || null,
     }),
+  getLocalApiRuntimeStatus: () =>
+    invoke<LocalApiRuntimeStatus>("get_local_api_runtime_status"),
+  getPendingApiImports: () =>
+    invoke<PendingApiImport[]>("get_pending_api_imports"),
+  getPendingApiExports: () =>
+    invoke<PendingApiExport[]>("get_pending_api_exports"),
+  approveLocalApiImport: (
+    requestId: string,
+    groupId: string | null,
+    newGroupName: string | null,
+    authKind: "password" | "totp",
+    credential: string
+  ) =>
+    invoke<VaultPayload>("approve_local_api_import", {
+      input: {
+        requestId,
+        groupId,
+        newGroupName,
+        authKind,
+        credential,
+      },
+    }),
+  denyLocalApiImport: (requestId: string) =>
+    invoke<VaultPayload>("deny_local_api_import", { requestId }),
+  approveLocalApiExport: (
+    requestId: string,
+    authKind: "password" | "totp",
+    credential: string
+  ) =>
+    invoke<VaultPayload>("approve_local_api_export", {
+      requestId,
+      authKind,
+      credential,
+    }),
+  denyLocalApiExport: (requestId: string) =>
+    invoke<VaultPayload>("deny_local_api_export", { requestId }),
+  createLocalApiKey: (
+    name: string,
+    groupId: string,
+    authKind: "password" | "totp",
+    credential: string
+  ) =>
+    invoke<CreatedApiKey>("create_local_api_key", {
+      name,
+      groupId,
+      authKind,
+      credential,
+    }),
+  setLocalApiExportEnabled: (
+    enabled: boolean,
+    authKind?: "password" | "totp",
+    credential?: string
+  ) =>
+    invoke<LocalApiConfig>("set_local_api_export_enabled", {
+      enabled,
+      authKind: authKind ?? null,
+      credential: credential ?? null,
+    }),
+  setLocalApiKeyEnabled: (keyId: string, enabled: boolean) =>
+    invoke<LocalApiConfig>("set_local_api_key_enabled", { keyId, enabled }),
+  deleteLocalApiKey: (keyId: string) =>
+    invoke<LocalApiConfig>("delete_local_api_key", { keyId }),
 };

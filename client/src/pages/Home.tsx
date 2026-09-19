@@ -3,6 +3,9 @@ import { Button } from "@/components/ui/button";
 import AuthScreen from "@/components/AuthScreen";
 import UnlockTransition from "@/components/UnlockTransition";
 import VaultSettingsPage from "@/components/VaultSettingsPage";
+import LocalApiPage from "@/components/LocalApiPage";
+import LocalApiImportDialog from "@/components/LocalApiImportDialog";
+import LocalApiExportDialog from "@/components/LocalApiExportDialog";
 import {
   Dialog,
   DialogContent,
@@ -40,6 +43,7 @@ import {
   KeyRound,
   Lock,
   Menu,
+  Network,
   PanelLeft,
   PanelLeftClose,
   Plus,
@@ -67,6 +71,8 @@ import {
 } from "@/lib/shellStore";
 import type {
   UnlockView,
+  PendingApiImport,
+  PendingApiExport,
   VaultAccount,
   VaultEmail,
   VaultGroup,
@@ -76,6 +82,7 @@ import type {
 import type { Dictionary } from "@/lib/i18n";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { vaultApi } from "@/lib/vaultApi";
+import { listen } from "@tauri-apps/api/event";
 
 const QR_TEXTURE = "./assets/github-vault-qr-panel_14bbe081.jpg";
 const EMPTY_STATE = "./assets/github-vault-empty-state_546529c7.jpg";
@@ -288,6 +295,13 @@ export default function Home() {
   const [isAccountDialogOpen, setAccountDialogOpen] = useState(false);
   const [isGroupDialogOpen, setGroupDialogOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
+  const [isLocalApiOpen, setLocalApiOpen] = useState(false);
+  const [pendingApiImports, setPendingApiImports] = useState<
+    PendingApiImport[]
+  >([]);
+  const [pendingApiExports, setPendingApiExports] = useState<
+    PendingApiExport[]
+  >([]);
   const [activeGroup, setActiveGroup] = useState("all");
   const search = useShellSearch();
   const sidebarCollapsed = useSidebarCollapsed();
@@ -424,6 +438,67 @@ export default function Home() {
     if (!vault) setShellSearch("");
   }, [vault]);
 
+  useEffect(() => {
+    if (!vault) {
+      setPendingApiImports([]);
+      setPendingApiExports([]);
+      return;
+    }
+    let disposed = false;
+    const unlisteners: Array<() => void> = [];
+    vaultApi
+      .getPendingApiImports()
+      .then(requests => !disposed && setPendingApiImports(requests))
+      .catch(() => undefined);
+    vaultApi
+      .getPendingApiExports()
+      .then(requests => !disposed && setPendingApiExports(requests))
+      .catch(() => undefined);
+    listen<PendingApiImport>("local-api-import-request", event => {
+      if (disposed) return;
+      setPendingApiImports(current =>
+        current.some(request => request.id === event.payload.id)
+          ? current
+          : [...current, event.payload]
+      );
+    }).then(unlisten => {
+      if (disposed) unlisten();
+      else unlisteners.push(unlisten);
+    });
+    listen<PendingApiExport>("local-api-export-request", event => {
+      if (disposed) return;
+      setPendingApiExports(current =>
+        current.some(request => request.id === event.payload.id)
+          ? current
+          : [...current, event.payload]
+      );
+    }).then(unlisten => {
+      if (disposed) unlisten();
+      else unlisteners.push(unlisten);
+    });
+    listen("local-api-state-changed", () => {
+      vaultApi
+        .getUnlockedPayload()
+        .then(payload => !disposed && setVault(payload))
+        .catch(() => undefined);
+      vaultApi
+        .getPendingApiImports()
+        .then(requests => !disposed && setPendingApiImports(requests))
+        .catch(() => undefined);
+      vaultApi
+        .getPendingApiExports()
+        .then(requests => !disposed && setPendingApiExports(requests))
+        .catch(() => undefined);
+    }).then(unlisten => {
+      if (disposed) unlisten();
+      else unlisteners.push(unlisten);
+    });
+    return () => {
+      disposed = true;
+      unlisteners.forEach(unlisten => unlisten());
+    };
+  }, [Boolean(vault)]);
+
   // The toolbar chip shows which group the index is filtered by.
   useEffect(() => {
     if (!vault || activeGroup === "all") {
@@ -452,6 +527,7 @@ export default function Home() {
   function selectGroup(groupId: string) {
     setActiveGroup(groupId);
     setSettingsOpen(false);
+    setLocalApiOpen(false);
   }
 
   async function persist(next: VaultPayload) {
@@ -495,6 +571,9 @@ export default function Home() {
     setAccountDialogOpen(false);
     setGroupDialogOpen(false);
     setSettingsOpen(false);
+    setLocalApiOpen(false);
+    setPendingApiImports([]);
+    setPendingApiExports([]);
   }
 
   async function handleCopy(value: string, label: string) {
@@ -983,7 +1062,32 @@ export default function Home() {
               }`}
             >
               <button
-                onClick={() => setSettingsOpen(true)}
+                onClick={() => {
+                  setLocalApiOpen(true);
+                  setSettingsOpen(false);
+                }}
+                aria-label={
+                  language.startsWith("zh") ? "本机接口" : "Local API"
+                }
+                title={language.startsWith("zh") ? "本机接口" : "Local API"}
+                className={`flex h-[38px] items-center rounded-[9px] text-sm font-medium text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-200 ${
+                  sidebarCollapsed
+                    ? "w-[38px] justify-center"
+                    : "w-full gap-3 px-3"
+                }`}
+              >
+                <Network size={16} />
+                {!sidebarCollapsed && (
+                  <span>
+                    {language.startsWith("zh") ? "本机接口" : "Local API"}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setSettingsOpen(true);
+                  setLocalApiOpen(false);
+                }}
                 aria-label={t.home.settings}
                 title={t.home.settings}
                 className={`flex h-[38px] items-center rounded-[9px] text-sm font-medium text-zinc-400 transition-colors hover:bg-white/[0.04] hover:text-zinc-200 ${
@@ -1053,6 +1157,13 @@ export default function Home() {
                 );
               }}
               onImported={payload => setVault(payload)}
+            />
+          ) : isLocalApiOpen ? (
+            <LocalApiPage
+              onBack={() => setLocalApiOpen(false)}
+              vault={vault}
+              quickUnlockEnabled={quickUnlockEnabled}
+              onVaultChange={setVault}
             />
           ) : (
             <>
@@ -1124,7 +1235,21 @@ export default function Home() {
                       <FolderPlus /> {t.home.addGroup}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="bg-white/[0.08]" />
-                    <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        setLocalApiOpen(true);
+                        setSettingsOpen(false);
+                      }}
+                    >
+                      <Network />
+                      {language.startsWith("zh") ? "本机接口" : "Local API"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        setSettingsOpen(true);
+                        setLocalApiOpen(false);
+                      }}
+                    >
                       <Settings2 /> {t.home.settings}
                     </DropdownMenuItem>
                     <DropdownMenuItem
@@ -1219,6 +1344,37 @@ export default function Home() {
           {t.home.footerNoSync}
         </span>
       </footer>
+
+      <LocalApiImportDialog
+        request={pendingApiImports[0] ?? null}
+        groups={vault.groups}
+        quickUnlockEnabled={quickUnlockEnabled}
+        onResolved={payload => {
+          const resolvedId = pendingApiImports[0]?.id;
+          setVault(payload);
+          if (resolvedId) {
+            setPendingApiImports(current =>
+              current.filter(request => request.id !== resolvedId)
+            );
+          }
+        }}
+      />
+
+      <LocalApiExportDialog
+        request={
+          pendingApiImports.length === 0 ? (pendingApiExports[0] ?? null) : null
+        }
+        quickUnlockEnabled={quickUnlockEnabled}
+        onResolved={payload => {
+          const resolvedId = pendingApiExports[0]?.id;
+          setVault(payload);
+          if (resolvedId) {
+            setPendingApiExports(current =>
+              current.filter(request => request.id !== resolvedId)
+            );
+          }
+        }}
+      />
 
       {context && (
         <div

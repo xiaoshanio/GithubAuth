@@ -214,7 +214,7 @@ fn protect(data: &[u8]) -> Result<Vec<u8>, String> {
         Security::Cryptography::{CryptProtectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB},
     };
 
-    let mut input = CRYPT_INTEGER_BLOB {
+    let input = CRYPT_INTEGER_BLOB {
         cbData: u32::try_from(data.len())
             .map_err(|_| "Quick unlock data is too large".to_string())?,
         pbData: data.as_ptr() as *mut u8,
@@ -230,7 +230,7 @@ fn protect(data: &[u8]) -> Result<Vec<u8>, String> {
     };
     let success = unsafe {
         CryptProtectData(
-            &mut input,
+            &input,
             ptr::null(),
             &entropy,
             ptr::null(),

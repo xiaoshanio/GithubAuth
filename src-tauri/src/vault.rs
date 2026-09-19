@@ -13,6 +13,8 @@ use std::collections::HashSet;
 use uuid::Uuid;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
+use crate::local_api::LocalApiConfig;
+
 pub const MAX_VAULT_BYTES: usize = 10 * 1024 * 1024;
 const VAULT_FORMAT: &str = "github-auth-vault";
 const VAULT_VERSION: u8 = 2;
@@ -85,6 +87,8 @@ pub struct VaultPayload {
     pub groups: Vec<VaultGroup>,
     pub accounts: Vec<VaultAccount>,
     pub settings: VaultSettings,
+    #[serde(default)]
+    pub local_api: LocalApiConfig,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -449,6 +453,7 @@ pub fn validate_payload(payload: &VaultPayload) -> Result<(), String> {
     {
         return Err("Vault settings are invalid".to_string());
     }
+    crate::local_api::validate_config(&payload.local_api, &payload.groups)?;
     if payload.groups.iter().any(|group| {
         group.id.is_empty()
             || group.id.len() > 128
@@ -545,6 +550,7 @@ mod tests {
                 updated_at: "2026-08-15T00:00:00.000Z".to_string(),
             }],
             settings: VaultSettings::default(),
+            local_api: LocalApiConfig::default(),
         }
     }
 
