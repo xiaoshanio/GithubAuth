@@ -149,6 +149,38 @@ export default function LocalApiExportDialog({
             <p className="rounded-xl border border-white/[0.07] bg-black/20 px-4 py-3 text-sm leading-6 text-zinc-400">
               {request.application.description}
             </p>
+            <p className="break-words text-xs leading-5 text-sky-200/70">
+              {zh ? "本次用途：" : "Purpose: "}
+              {request.purpose}
+            </p>
+            <div className="mt-3 rounded-xl border border-amber-300/15 bg-amber-300/[0.04] px-4 py-3 text-xs leading-5 text-zinc-400">
+              <p className="font-bold text-amber-200">
+                {request.signatureStatus === "verified"
+                  ? zh
+                    ? "已验证调用程序"
+                    : "Verified caller"
+                  : zh
+                    ? "调用方自报信息，未验证可执行程序"
+                    : "Caller-supplied identity; executable not verified"}
+              </p>
+              <p className="mt-1 break-all">
+                {zh ? "路径" : "Path"}：
+                {request.executablePath || (zh ? "未提供" : "Not provided")}
+              </p>
+              <p className="break-all">
+                SHA-256：
+                {request.executableSha256 || (zh ? "未验证" : "Unverified")}
+              </p>
+              <p className="break-all">
+                {zh ? "签名发布者" : "Publisher"}：
+                {request.authenticodePublisher ||
+                  (zh ? "未验证" : "Unverified")}
+              </p>
+              <p className="break-all">
+                {zh ? "来源" : "Source"}：{request.remoteAddress}
+                {request.sourcePid ? ` · PID ${request.sourcePid}` : ""}
+              </p>
+            </div>
           </DialogHeader>
         </div>
 

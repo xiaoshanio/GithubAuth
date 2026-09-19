@@ -184,6 +184,21 @@ export default function LocalApiImportDialog({
             <p className="rounded-xl border border-white/[0.07] bg-black/20 px-4 py-3 text-sm leading-6 text-zinc-400">
               {request.application.description}
             </p>
+            <p className="break-words text-xs leading-5 text-violet-200/70">
+              {zh ? "本次用途：" : "Purpose: "}
+              {request.purpose}
+            </p>
+            <p className="break-all text-xs leading-5 text-amber-200/70">
+              {request.signatureStatus === "verified"
+                ? zh
+                  ? "已验证调用程序"
+                  : "Verified caller"
+                : zh
+                  ? "调用方自报信息，未验证可执行程序"
+                  : "Caller-supplied identity; executable not verified"}
+              {` · ${request.remoteAddress}`}
+              {request.sourcePid ? ` · PID ${request.sourcePid}` : ""}
+            </p>
           </DialogHeader>
         </div>
 

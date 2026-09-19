@@ -52,36 +52,70 @@ export type LocalApiKey = {
   name: string;
   keyHash: string;
   groupId: string;
+  clientId: string | null;
+  requiresRepair: boolean;
   enabled: boolean;
   createdAt: string;
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+};
+
+export type PairedClient = {
+  id: string;
+  applicationName: string;
+  developer: string;
+  description: string;
+  icon: string;
+  certificateFingerprint: string;
+  encryptionPublicKey: string;
+  executablePath: string;
+  executableSha256: string;
+  authenticodePublisher: string;
+  signatureStatus: string;
+  allowImport: boolean;
+  allowRead: boolean;
+  groupId: string | null;
+  enabled: boolean;
+  createdAt: string;
+  expiresAt: string;
   lastUsedAt: string | null;
 };
 
 export type LocalApiLog = {
   id: string;
   occurredAt: string;
-  method: string;
+  method?: string | null;
+  clientId: string | null;
   endpoint: string;
   action:
     | "import_request"
     | "import_approved"
     | "import_denied"
-    | "account_export"
+    | "account_request"
+    | "account_approved"
+    | "account_denied"
+    | "client_paired"
     | "api_key_created"
     | string;
   outcome: "pending" | "success" | "denied" | "blocked" | string;
   appName: string;
   developer: string;
+  certificateFingerprint: string | null;
+  executableSha256: string | null;
   apiKeyName: string | null;
   groupId: string | null;
   accountCount: number;
+  sourcePid: number | null;
   remoteAddress: string;
+  requestId: string | null;
   detail: string;
 };
 
 export type LocalApiConfig = {
+  protocolVersion: number;
   exportEnabled: boolean;
   apiKeys: LocalApiKey[];
+  clients: PairedClient[];
   logs: LocalApiLog[];
 };
 
@@ -90,6 +124,7 @@ export type ClientApplication = {
   developer: string;
   icon: string;
   description: string;
+  executablePath: string;
 };
 
 export type IncomingAccount = {
@@ -105,10 +140,16 @@ export type IncomingAccount = {
 
 export type PendingApiImport = {
   id: string;
+  clientId: string;
   application: ClientApplication;
+  purpose: string;
   accounts: IncomingAccount[];
   requestedAt: string;
   remoteAddress: string;
+  sourcePid: number | null;
+  executableSha256: string;
+  authenticodePublisher: string;
+  signatureStatus: string;
 };
 
 export type ExportAccountPreview = {
@@ -120,7 +161,9 @@ export type ExportAccountPreview = {
 
 export type PendingApiExport = {
   id: string;
+  clientId: string;
   application: ClientApplication;
+  purpose: string;
   apiKeyName: string;
   apiKeyId: string;
   groupId: string;
@@ -128,13 +171,43 @@ export type PendingApiExport = {
   accounts: ExportAccountPreview[];
   requestedAt: string;
   remoteAddress: string;
+  sourcePid: number | null;
+  executablePath: string;
+  executableSha256: string;
+  authenticodePublisher: string;
+  signatureStatus: string;
+};
+
+export type PendingPairing = {
+  id: string;
+  clientId: string;
+  application: ClientApplication;
+  purpose: string;
+  allowImport: boolean;
+  allowRead: boolean;
+  groupId: string | null;
+  groupName: string | null;
+  requestedAt: string;
+  remoteAddress: string;
+  sourcePid: number | null;
+  executablePath: string;
+  executableSha256: string;
+  authenticodePublisher: string;
+  signatureStatus: string;
 };
 
 export type LocalApiRuntimeStatus = {
   listening: boolean;
   baseUrl: string;
   importEndpoint: string;
-  exportEndpoint: string;
+  accountEndpoint: string;
+  pairingEndpoint: string;
+  protocolVersion: number;
+  tls13: boolean;
+  mtls: boolean;
+  instanceId: string;
+  spkiFingerprint: string;
+  serverEncryptionPublicKey: string;
 };
 
 export type VaultPayload = {

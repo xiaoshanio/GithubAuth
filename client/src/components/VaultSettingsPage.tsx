@@ -27,6 +27,8 @@ import type {
   VaultSettings,
 } from "@/lib/types";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useScreenCaptureProtection } from "@/contexts/ScreenCaptureProtectionContext";
+import { getScreenCaptureMessages } from "@/lib/i18n/screenCapture";
 import { vaultApi } from "@/lib/vaultApi";
 import {
   ArchiveRestore,
@@ -40,6 +42,7 @@ import {
   Languages,
   QrCode,
   RotateCcw,
+  ScreenShareOff,
   Settings2,
   ShieldCheck,
   Trash2,
@@ -67,6 +70,8 @@ export default function VaultSettingsPage({
 }: Props) {
   const { language, languages, t: dictionary, setLanguage } = useLanguage();
   const t = dictionary.settings;
+  const captureProtection = useScreenCaptureProtection();
+  const captureMessages = getScreenCaptureMessages(language);
   const [preferences, setPreferences] = useState(settings);
   const [passwordChange, setPasswordChange] = useState({
     current: "",
@@ -337,6 +342,52 @@ export default function VaultSettingsPage({
             <p className="mb-4 flex items-center gap-2 text-xs font-bold text-zinc-500">
               <ShieldCheck size={15} /> {t.security}
             </p>
+            <div className="mb-5 flex items-start justify-between gap-5 rounded-xl border border-white/[0.08] bg-white/[0.025] p-4">
+              <div className="flex min-w-0 gap-3">
+                <div className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg border border-violet-300/15 bg-violet-400/[0.07] text-violet-200">
+                  <ScreenShareOff size={17} />
+                </div>
+                <div>
+                  <Label
+                    htmlFor="screen-capture-protection"
+                    className="text-sm font-bold"
+                  >
+                    {captureMessages.settingTitle}
+                  </Label>
+                  <p className="mt-1 text-xs leading-5 text-zinc-500">
+                    {captureMessages.settingHint}
+                  </p>
+                  <p
+                    className={`mt-2 text-xs ${
+                      captureProtection.status === "unavailable"
+                        ? "text-amber-300/80"
+                        : captureProtection.enabled
+                          ? "text-emerald-300/80"
+                          : "text-zinc-500"
+                    }`}
+                  >
+                    {captureProtection.status === "unavailable"
+                      ? captureMessages.unavailableStatus
+                      : captureProtection.status === "applying"
+                        ? captureMessages.applyingStatus
+                        : captureProtection.enabled
+                          ? captureMessages.enabledStatus
+                          : captureMessages.disabledStatus}
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="screen-capture-protection"
+                checked={captureProtection.enabled}
+                disabled={
+                  captureProtection.status === "applying" ||
+                  captureProtection.status === "unavailable"
+                }
+                onCheckedChange={captureProtection.setEnabled}
+                aria-label={captureMessages.settingTitle}
+                className="mt-1 shrink-0"
+              />
+            </div>
             <div className="grid gap-3 lg:grid-cols-3">
               <Input
                 type="password"

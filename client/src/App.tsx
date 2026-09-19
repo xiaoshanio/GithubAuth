@@ -6,8 +6,8 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import TitleBar from "./components/TitleBar";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { ScreenCaptureProtectionProvider } from "./contexts/ScreenCaptureProtectionContext";
 import Home from "./pages/Home";
-
 
 function Router() {
   return (
@@ -26,22 +26,24 @@ function App() {
   return (
     <ErrorBoundary>
       <LanguageProvider>
-      <ThemeProvider
-        defaultTheme="dark"
-        // switchable
-      >
-        <TooltipProvider>
-          {/* The OS title bar is replaced by TitleBar, so the shell owns the full
-              window height and every screen scrolls inside this column. */}
-          <div className="flex h-screen flex-col overflow-hidden bg-[#08080a]">
-            <TitleBar />
-            <div className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto">
-              <Router />
-            </div>
-          </div>
-          <Toaster />
-        </TooltipProvider>
-      </ThemeProvider>
+        <ScreenCaptureProtectionProvider>
+          <ThemeProvider
+            defaultTheme="dark"
+            // switchable
+          >
+            <TooltipProvider>
+              {/* The OS title bar is replaced by TitleBar, so the shell owns the full
+                  window height and every screen scrolls inside this column. */}
+              <div className="flex h-screen flex-col overflow-hidden bg-[#08080a]">
+                <TitleBar />
+                <div className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto">
+                  <Router />
+                </div>
+              </div>
+              <Toaster />
+            </TooltipProvider>
+          </ThemeProvider>
+        </ScreenCaptureProtectionProvider>
       </LanguageProvider>
     </ErrorBoundary>
   );

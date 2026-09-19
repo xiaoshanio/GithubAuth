@@ -1,6 +1,6 @@
 /* Windows Hello consent gate for destructive whole-vault actions. The OS never
-   exposes the account password; the app only learns whether an interactive
-   Windows user verified their identity (or that Hello is not usable at all). */
+exposes the account password; the app only learns whether an interactive
+Windows user verified their identity (or that Hello is not usable at all). */
 use serde::Serialize;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -13,7 +13,9 @@ pub enum HelloAvailability {
 
 #[cfg(windows)]
 pub fn check_availability() -> Result<HelloAvailability, String> {
-    use windows::Security::Credentials::UI::{UserConsentVerifier, UserConsentVerifierAvailability};
+    use windows::Security::Credentials::UI::{
+        UserConsentVerifier, UserConsentVerifierAvailability,
+    };
 
     let availability = UserConsentVerifier::CheckAvailabilityAsync()
         .map_err(|error| format!("Unable to query Windows Hello: {error}"))?
@@ -29,8 +31,8 @@ pub fn check_availability() -> Result<HelloAvailability, String> {
 
 #[cfg(windows)]
 pub fn request_verification(message: &str) -> Result<bool, String> {
-    use windows::Security::Credentials::UI::{UserConsentVerificationResult, UserConsentVerifier};
     use windows::core::HSTRING;
+    use windows::Security::Credentials::UI::{UserConsentVerificationResult, UserConsentVerifier};
 
     let result = UserConsentVerifier::RequestVerificationAsync(&HSTRING::from(message))
         .map_err(|error| format!("Unable to start Windows Hello: {error}"))?

@@ -6,6 +6,8 @@ import VaultSettingsPage from "@/components/VaultSettingsPage";
 import LocalApiPage from "@/components/LocalApiPage";
 import LocalApiImportDialog from "@/components/LocalApiImportDialog";
 import LocalApiExportDialog from "@/components/LocalApiExportDialog";
+import LocalApiPairingDialog from "@/components/LocalApiPairingDialog";
+import ScreenCaptureRiskDialog from "@/components/ScreenCaptureRiskDialog";
 import {
   Dialog,
   DialogContent,
@@ -73,6 +75,7 @@ import type {
   UnlockView,
   PendingApiImport,
   PendingApiExport,
+  PendingPairing,
   VaultAccount,
   VaultEmail,
   VaultGroup,
@@ -302,6 +305,9 @@ export default function Home() {
   const [pendingApiExports, setPendingApiExports] = useState<
     PendingApiExport[]
   >([]);
+  const [pendingApiPairings, setPendingApiPairings] = useState<
+    PendingPairing[]
+  >([]);
   const [activeGroup, setActiveGroup] = useState("all");
   const search = useShellSearch();
   const sidebarCollapsed = useSidebarCollapsed();
@@ -440,12 +446,17 @@ export default function Home() {
 
   useEffect(() => {
     if (!vault) {
+      setPendingApiPairings([]);
       setPendingApiImports([]);
       setPendingApiExports([]);
       return;
     }
     let disposed = false;
     const unlisteners: Array<() => void> = [];
+    vaultApi
+      .getPendingApiPairings()
+      .then(requests => !disposed && setPendingApiPairings(requests))
+      .catch(() => undefined);
     vaultApi
       .getPendingApiImports()
       .then(requests => !disposed && setPendingApiImports(requests))
@@ -454,6 +465,17 @@ export default function Home() {
       .getPendingApiExports()
       .then(requests => !disposed && setPendingApiExports(requests))
       .catch(() => undefined);
+    listen<PendingPairing>("local-api-pairing-request", event => {
+      if (disposed) return;
+      setPendingApiPairings(current =>
+        current.some(request => request.id === event.payload.id)
+          ? current
+          : [...current, event.payload]
+      );
+    }).then(unlisten => {
+      if (disposed) unlisten();
+      else unlisteners.push(unlisten);
+    });
     listen<PendingApiImport>("local-api-import-request", event => {
       if (disposed) return;
       setPendingApiImports(current =>
@@ -480,6 +502,10 @@ export default function Home() {
       vaultApi
         .getUnlockedPayload()
         .then(payload => !disposed && setVault(payload))
+        .catch(() => undefined);
+      vaultApi
+        .getPendingApiPairings()
+        .then(requests => !disposed && setPendingApiPairings(requests))
         .catch(() => undefined);
       vaultApi
         .getPendingApiImports()
@@ -572,6 +598,7 @@ export default function Home() {
     setGroupDialogOpen(false);
     setSettingsOpen(false);
     setLocalApiOpen(false);
+    setPendingApiPairings([]);
     setPendingApiImports([]);
     setPendingApiExports([]);
   }
@@ -1345,8 +1372,34 @@ export default function Home() {
         </span>
       </footer>
 
+      <LocalApiPairingDialog
+        request={pendingApiPairings[0] ?? null}
+        quickUnlockEnabled={quickUnlockEnabled}
+        onApproved={payload => {
+          const resolvedId = pendingApiPairings[0]?.id;
+          setVault(payload);
+          if (resolvedId) {
+            setPendingApiPairings(current =>
+              current.filter(request => request.id !== resolvedId)
+            );
+          }
+        }}
+        onDenied={() => {
+          const resolvedId = pendingApiPairings[0]?.id;
+          if (resolvedId) {
+            setPendingApiPairings(current =>
+              current.filter(request => request.id !== resolvedId)
+            );
+          }
+        }}
+      />
+
       <LocalApiImportDialog
-        request={pendingApiImports[0] ?? null}
+        request={
+          pendingApiPairings.length === 0
+            ? (pendingApiImports[0] ?? null)
+            : null
+        }
         groups={vault.groups}
         quickUnlockEnabled={quickUnlockEnabled}
         onResolved={payload => {
@@ -1362,7 +1415,9 @@ export default function Home() {
 
       <LocalApiExportDialog
         request={
-          pendingApiImports.length === 0 ? (pendingApiExports[0] ?? null) : null
+          pendingApiPairings.length === 0 && pendingApiImports.length === 0
+            ? (pendingApiExports[0] ?? null)
+            : null
         }
         quickUnlockEnabled={quickUnlockEnabled}
         onResolved={payload => {
@@ -1373,6 +1428,13 @@ export default function Home() {
               current.filter(request => request.id !== resolvedId)
             );
           }
+        }}
+      />
+
+      <ScreenCaptureRiskDialog
+        onOpenSettings={() => {
+          setSettingsOpen(true);
+          setLocalApiOpen(false);
         }}
       />
 

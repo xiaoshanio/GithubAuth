@@ -504,11 +504,34 @@ pub fn validate_payload(payload: &VaultPayload) -> Result<(), String> {
         return Err("Vault account IDs must be unique".to_string());
     }
     if payload.accounts.iter().any(|account| {
-        account.emails.iter().any(|email| email.value.trim().is_empty() || email.value.len() > 512)
-            || account.emails.iter().filter(|email| email.is_primary).count() > 1
-            || account.emails.iter().filter(|email| email.show_on_home).count() > 2
-            || (!account.emails.is_empty() && account.emails.iter().filter(|email| email.is_primary).count() != 1)
-            || (!account.emails.is_empty() && !account.emails.iter().any(|email| email.show_on_home && email.is_primary))
+        account
+            .emails
+            .iter()
+            .any(|email| email.value.trim().is_empty() || email.value.len() > 512)
+            || account
+                .emails
+                .iter()
+                .filter(|email| email.is_primary)
+                .count()
+                > 1
+            || account
+                .emails
+                .iter()
+                .filter(|email| email.show_on_home)
+                .count()
+                > 2
+            || (!account.emails.is_empty()
+                && account
+                    .emails
+                    .iter()
+                    .filter(|email| email.is_primary)
+                    .count()
+                    != 1)
+            || (!account.emails.is_empty()
+                && !account
+                    .emails
+                    .iter()
+                    .any(|email| email.show_on_home && email.is_primary))
     }) {
         return Err("Account email settings are invalid".to_string());
     }
@@ -539,7 +562,11 @@ mod tests {
                 id: "account-1".to_string(),
                 name: "octocat".to_string(),
                 email: "secret@example.com".to_string(),
-                emails: vec![VaultEmail { value: "secret@example.com".to_string(), is_primary: true, show_on_home: true }],
+                emails: vec![VaultEmail {
+                    value: "secret@example.com".to_string(),
+                    is_primary: true,
+                    show_on_home: true,
+                }],
                 password: "never-store-this-in-plaintext".to_string(),
                 totp_secret: "JBSWY3DPEHPK3PXP".to_string(),
                 group_id: "group-1".to_string(),

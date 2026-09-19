@@ -356,12 +356,16 @@ fn verify_password_for_action(
 }
 
 #[tauri::command]
-fn lock_vault(state: State<'_, AppSecurityState>) -> Result<(), String> {
+fn lock_vault(
+    state: State<'_, AppSecurityState>,
+    runtime: State<'_, local_api::LocalApiRuntime>,
+) -> Result<(), String> {
     let mut security = state_lock(&state)?;
     security.unlocked = None;
     security.pending_initialization = None;
     security.pending_import = None;
     security.pending_rebind = None;
+    local_api::on_vault_locked(&runtime);
     Ok(())
 }
 
@@ -487,6 +491,7 @@ fn check_windows_hello() -> Result<windows_consent::HelloAvailability, String> {
 async fn reset_vault(
     app: AppHandle,
     state: State<'_, AppSecurityState>,
+    runtime: State<'_, local_api::LocalApiRuntime>,
     acknowledgment: Option<String>,
 ) -> Result<ResetOutcome, String> {
     let verified_by = tauri::async_runtime::spawn_blocking(move || {
@@ -500,6 +505,7 @@ async fn reset_vault(
     let backup_path = backup_reset_snapshot(&app)?;
 
     let mut security = state_lock(&state)?;
+    local_api::reset_security(&app, &runtime)?;
     storage::remove_if_exists(&vault_path(&app)?)?;
     quick_unlock::disable(&app)?;
     *security = SecurityState::default();
@@ -512,7 +518,8 @@ async fn reset_vault(
 fn verify_reset_consent(acknowledgment: Option<&str>) -> Result<&'static str, String> {
     match windows_consent::check_availability()? {
         windows_consent::HelloAvailability::Available => {
-            if windows_consent::request_verification("验证 Windows 身份后才能重置 Github Auth")? {
+            if windows_consent::request_verification("验证 Windows 身份后才能重置 Github Auth")?
+            {
                 Ok("windowsHello")
             } else {
                 Err("Windows 身份验证未通过，已取消重置".to_string())
@@ -701,6 +708,16 @@ fn start_backup_scheduler(app: AppHandle) {
     });
 }
 
+#[tauri::command]
+fn set_screen_capture_protection(
+    window: tauri::WebviewWindow,
+    enabled: bool,
+) -> Result<(), String> {
+    window
+        .set_content_protected(enabled)
+        .map_err(|error| format!("Unable to update screen capture protection: {error}"))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -745,9 +762,14 @@ pub fn run() {
             cancel_backup_import,
             commit_backup_import,
             get_unlocked_payload,
+            set_screen_capture_protection,
             local_api::get_local_api_runtime_status,
+            local_api::export_local_api_connection,
+            local_api::get_pending_api_pairings,
             local_api::get_pending_api_imports,
             local_api::get_pending_api_exports,
+            local_api::approve_local_api_pairing,
+            local_api::deny_local_api_pairing,
             local_api::approve_local_api_import,
             local_api::deny_local_api_import,
             local_api::approve_local_api_export,
@@ -756,6 +778,9 @@ pub fn run() {
             local_api::set_local_api_export_enabled,
             local_api::set_local_api_key_enabled,
             local_api::delete_local_api_key,
+            local_api::set_local_api_client_enabled,
+            local_api::revoke_local_api_client,
+            local_api::rotate_local_api_identity,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Github Auth");

@@ -3,6 +3,7 @@ import type {
   BackupSettings,
   LocalApiConfig,
   LocalApiRuntimeStatus,
+  PendingPairing,
   PendingApiImport,
   PendingApiExport,
   ImportMode,
@@ -14,6 +15,7 @@ import type {
 } from "./types";
 
 export type CreatedApiKey = {
+  keyId: string;
   apiKey: string;
   config: LocalApiConfig;
 };
@@ -84,10 +86,26 @@ export const vaultApi = {
     }),
   getLocalApiRuntimeStatus: () =>
     invoke<LocalApiRuntimeStatus>("get_local_api_runtime_status"),
+  exportLocalApiConnection: () =>
+    invoke<string | null>("export_local_api_connection"),
+  getPendingApiPairings: () =>
+    invoke<PendingPairing[]>("get_pending_api_pairings"),
   getPendingApiImports: () =>
     invoke<PendingApiImport[]>("get_pending_api_imports"),
   getPendingApiExports: () =>
     invoke<PendingApiExport[]>("get_pending_api_exports"),
+  approveLocalApiPairing: (
+    requestId: string,
+    authKind: "password" | "totp",
+    credential: string
+  ) =>
+    invoke<VaultPayload>("approve_local_api_pairing", {
+      requestId,
+      authKind,
+      credential,
+    }),
+  denyLocalApiPairing: (requestId: string) =>
+    invoke<void>("deny_local_api_pairing", { requestId }),
   approveLocalApiImport: (
     requestId: string,
     groupId: string | null,
@@ -121,12 +139,14 @@ export const vaultApi = {
   createLocalApiKey: (
     name: string,
     groupId: string,
+    expiresInDays: number,
     authKind: "password" | "totp",
     credential: string
   ) =>
     invoke<CreatedApiKey>("create_local_api_key", {
       name,
       groupId,
+      expiresInDays,
       authKind,
       credential,
     }),
@@ -144,4 +164,16 @@ export const vaultApi = {
     invoke<LocalApiConfig>("set_local_api_key_enabled", { keyId, enabled }),
   deleteLocalApiKey: (keyId: string) =>
     invoke<LocalApiConfig>("delete_local_api_key", { keyId }),
+  setLocalApiClientEnabled: (clientId: string, enabled: boolean) =>
+    invoke<LocalApiConfig>("set_local_api_client_enabled", {
+      clientId,
+      enabled,
+    }),
+  revokeLocalApiClient: (clientId: string) =>
+    invoke<LocalApiConfig>("revoke_local_api_client", { clientId }),
+  rotateLocalApiIdentity: (authKind: "password" | "totp", credential: string) =>
+    invoke<VaultPayload>("rotate_local_api_identity", {
+      authKind,
+      credential,
+    }),
 };

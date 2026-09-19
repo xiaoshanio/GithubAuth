@@ -20,6 +20,7 @@
         "resizable": true,
         "decorations": false,
         "shadow": true,
+        "contentProtected": true,
         "backgroundColor": "#08080A"
       }
     ],
