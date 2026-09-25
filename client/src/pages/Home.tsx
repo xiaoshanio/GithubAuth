@@ -452,21 +452,34 @@ export default function Home() {
       return;
     }
     let disposed = false;
+    let refreshVersion = 0;
     const unlisteners: Array<() => void> = [];
-    vaultApi
-      .getPendingApiPairings()
-      .then(requests => !disposed && setPendingApiPairings(requests))
-      .catch(() => undefined);
-    vaultApi
-      .getPendingApiImports()
-      .then(requests => !disposed && setPendingApiImports(requests))
-      .catch(() => undefined);
-    vaultApi
-      .getPendingApiExports()
-      .then(requests => !disposed && setPendingApiExports(requests))
-      .catch(() => undefined);
-    listen<PendingPairing>("local-api-pairing-request", event => {
+    const refreshPending = () => {
+      const version = ++refreshVersion;
+      vaultApi
+        .getPendingApiPairings()
+        .then(requests => {
+          if (!disposed && version === refreshVersion) setPendingApiPairings(requests);
+        })
+        .catch(() => undefined);
+      vaultApi
+        .getPendingApiImports()
+        .then(requests => {
+          if (!disposed && version === refreshVersion) setPendingApiImports(requests);
+        })
+        .catch(() => undefined);
+      vaultApi
+        .getPendingApiExports()
+        .then(requests => {
+          if (!disposed && version === refreshVersion) setPendingApiExports(requests);
+        })
+        .catch(() => undefined);
+    };
+    window.addEventListener("focus", refreshPending);
+    const refreshTimer = window.setInterval(refreshPending, 5_000);
+    const subscriptions = [listen<PendingPairing>("local-api-pairing-request", event => {
       if (disposed) return;
+      refreshVersion++;
       setPendingApiPairings(current =>
         current.some(request => request.id === event.payload.id)
           ? current
@@ -475,9 +488,10 @@ export default function Home() {
     }).then(unlisten => {
       if (disposed) unlisten();
       else unlisteners.push(unlisten);
-    });
+    }),
     listen<PendingApiImport>("local-api-import-request", event => {
       if (disposed) return;
+      refreshVersion++;
       setPendingApiImports(current =>
         current.some(request => request.id === event.payload.id)
           ? current
@@ -486,9 +500,10 @@ export default function Home() {
     }).then(unlisten => {
       if (disposed) unlisten();
       else unlisteners.push(unlisten);
-    });
+    }),
     listen<PendingApiExport>("local-api-export-request", event => {
       if (disposed) return;
+      refreshVersion++;
       setPendingApiExports(current =>
         current.some(request => request.id === event.payload.id)
           ? current
@@ -497,30 +512,26 @@ export default function Home() {
     }).then(unlisten => {
       if (disposed) unlisten();
       else unlisteners.push(unlisten);
-    });
+    }),
     listen("local-api-state-changed", () => {
       vaultApi
         .getUnlockedPayload()
         .then(payload => !disposed && setVault(payload))
         .catch(() => undefined);
-      vaultApi
-        .getPendingApiPairings()
-        .then(requests => !disposed && setPendingApiPairings(requests))
-        .catch(() => undefined);
-      vaultApi
-        .getPendingApiImports()
-        .then(requests => !disposed && setPendingApiImports(requests))
-        .catch(() => undefined);
-      vaultApi
-        .getPendingApiExports()
-        .then(requests => !disposed && setPendingApiExports(requests))
-        .catch(() => undefined);
+      refreshPending();
     }).then(unlisten => {
       if (disposed) unlisten();
       else unlisteners.push(unlisten);
+    })];
+    // Subscribe before reading the snapshot so a request cannot arrive between
+    // the initial read and event registration.
+    void Promise.allSettled(subscriptions).then(() => {
+      if (!disposed) refreshPending();
     });
     return () => {
       disposed = true;
+      window.removeEventListener("focus", refreshPending);
+      window.clearInterval(refreshTimer);
       unlisteners.forEach(unlisten => unlisten());
     };
   }, [Boolean(vault)]);
